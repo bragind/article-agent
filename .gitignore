@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+models/
+chroma_db/
+.env
+.DS_Store
+.streamlit/
+logs/
