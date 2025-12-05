@@ -6,3 +6,4 @@ chroma_db/
 .DS_Store
 .streamlit/
 logs/
+*.log

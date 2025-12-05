@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8501
+RUN mkdir -p logs
 
-CMD ["streamlit", "run", "src/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+# Основной режим — Telegram-бот
+CMD ["python", "src/bot.py"]

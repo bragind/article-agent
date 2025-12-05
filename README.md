@@ -1,30 +1,10 @@
-# AI-агент поиска статей (Кейс 2)
+# AI-агент поиска статей
 
-MVP на основе RAG для интеллектуального поиска и аннотирования статей.
+Основной интерфейс — **Telegram-бот**, который ищет статьи по IT-темам, генерирует ответы и указывает источники.
 
-## Установка
-\`\`\`bash
-make install
-\`\`\`
+## 🚀 Быстрый старт
 
-## Индексация
-\`\`\`bash
-make ingest
-\`\`\`
-
-## Запуск Streamlit
-\`\`\`bash
-make streamlit
-\`\`\`
-
-## Запуск Telegram-бота
-Создайте \`.env\` с \`TELEGRAM_BOT_TOKEN\` и выполните:
-\`\`\`bash
-make bot
-\`\`\`
-
-## Docker
-\`\`\`bash
-make docker-build
-make docker-run
-\`\`\`
+1. Получите токен у [@BotFather](https://t.me/BotFather)
+2. Создайте `.env`:
+   ```env
+   TELEGRAM_BOT_TOKEN=your_token_here

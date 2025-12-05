@@ -1,8 +1,16 @@
-streamlit
+# Основные зависимости
 chromadb
 sentence-transformers
-beautifulsoup4
 requests
-pytest
-aiogram
+beautifulsoup4
+
+# Интерфейсы
+streamlit
+aiogram>=3.0
 python-dotenv
+
+# Тестирование
+pytest
+
+# Линтер (опционально)
+flake8
