@@ -68,7 +68,7 @@ python src/bot.py
 # Или демо — Streamlit
 streamlit run src/app.py
 
-### Docker
+## Docker
 '''bash
 # Сборка
 docker build -t article-agent .
@@ -79,14 +79,14 @@ docker run --env-file .env article-agent
 # Запуск Streamlit
 docker run -p 8501:8501 article-agent streamlit run src/app.py --server.port=8501 --server.address=0.0.0.0
 
-### MLOps и CI/CD
+## MLOps и CI/CD
 - Версионирование кода (Git)
 - Тестирование (pytest)
 - Автоматическая сборка и публикация Docker-образа (GitHub Actions)
 - Логирование (logs/bot.log)
 - Конфигурация через config/config.yaml
 
-### Структура проекта
+## Структура проекта
 
 article-agent/
 ├── src/                  # Исходный код
@@ -107,12 +107,12 @@ article-agent/
 ├── .env.example
 └── README.md
 
-### Документация и материалы
+## Документация и материалы
 
 - Отчёт о работе — ход разработки, метрики, выводы
 - Презентация — финальная защита
 - Репозиторий: https://github.com/bragind/article-agent
 
-### Контакт
+## Контакты
 MLOps, Backend: Дмитрий Брагин
 Email: dimanb1982@gmail.com
