@@ -1,9 +1,33 @@
+# Данные парсера
+parser_articles/data/
+*.csv
+*.json
+*.jsonl
+
+# Виртуальное окружение
+venv/
+
+# Сторонние IDE / редакторы
+.idea/
+.vscode/
+
+# Кэш Python
 __pycache__/
 *.pyc
-models/
-chroma_db/
-.env
-.DS_Store
-.streamlit/
+
+# Логи
 logs/
 *.log
+
+# Сторонние файлы ОС
+.DS_Store
+
+# Модели, базы данных
+models/
+chroma_db/
+
+# Streamlit
+.streamlit/
+
+# Переменные окружения
+.env
