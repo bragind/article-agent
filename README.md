@@ -37,3 +37,46 @@
 ```bash
 git clone https://github.com/bragind/article-agent.git
 cd article-agent
+git lfs install
+git lfs pull
+
+# 2. Создайте окружение
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+## 📁 Данные
+
+- `data/articles_batch.jsonl` - 700 статей (Git LFS, 15MB)
+- Формат: JSONL с полями `title`, `text`, `author`, `url`, `date`, `source`
+
+## 🧠 Архитектура
+
+```
+Пользователь → Telegram/Web → RAG → Векторный поиск (ChromaDB) → LLM → Ответ с источниками
+```
+
+## 🔧 Парсинг статей
+
+```bash
+# Тест (5 статей)
+python parser_articles/main.py --limit 5
+
+# Полный сбор (700 статей)
+python parser_articles/main.py --all
+```
+
+## ⚙️ Конфигурация
+
+Настройки в `parser_articles/parsers/config.py`:
+- `MAX_ARTICLES = 700` - сколько статей собирать
+- `BASE_DELAY = 3.0` - задержка между запросами
+- `SECTIONS` - источники для парсинга
+
+## 📞 Контакты
+
+Issues: [GitHub](https://github.com/bragind/article-agent/issues)  
+Telegram: @bragind
+
+*Проект использует Git LFS для хранения больших файлов*
