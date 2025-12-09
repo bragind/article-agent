@@ -1,18 +1,27 @@
-# Основные зависимости
-chromadb
-sentence-transformers
-requests
-beautifulsoup4
-pandas
-lxml
+# Основные языковые модели и эмбеддинги для RAG
+sentence-transformers>=2.2.2
 
-# Интерфейсы
-streamlit
-aiogram>=3.0
-python-dotenv
+# Векторная база данных и её зависимости
+chromadb>=0.4.22
+pypika>=0.48.9
+posthog>=2.4.2
 
-# Тестирование
-pytest
+# Парсинг и обработка данных
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+requests>=2.31.0
+pandas>=2.0.0
 
-# Линтер (опционально)
-flake8
+# Дополнительные форматы для расширяемости
+PyPDF2>=3.0.0
+python-docx>=1.1.0
+
+# Интерфейсы (выберите один или оба)
+streamlit>=1.28.0
+aiogram>=3.0.0
+python-dotenv>=1.0.0
+
+# Тестирование и качество кода
+pytest>=7.4.0
+flake8>=6.0.0
+black>=23.0.0

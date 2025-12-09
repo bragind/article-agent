@@ -6,12 +6,21 @@ import re
 from datetime import datetime
 from typing import List, Dict
 import json
+import os
+
+# Импортируем конфигурацию
+from .config import (
+    MAX_ARTICLES, ARTICLES_PER_PAGE, PAGES_TO_CHECK, 
+    ARTICLES_PER_SECTION, BASE_DELAY, MAX_RANDOM_DELAY,
+    ERROR_DELAY, SECTIONS
+)
+# Импортируем чистку текста из отдельного модуля
+from ..utils.clean_text import clean_html
 
 
 class HabrParser:
     """
-    Современный парсер статей с Habr.com
-    Использует точные селекторы из структуры HTML
+    Парсер статей с Habr.com
     """
     
     BASE_URL = 'https://habr.com'
@@ -23,23 +32,15 @@ class HabrParser:
         'Connection': 'keep-alive',
     }
     
-    def __init__(self, delay: float = 1.5, timeout: int = 10):
-        """
-        :param delay: Базовая задержка между запросами (секунды)
-        :param timeout: Таймаут для HTTP-запросов
-        """
+    def __init__(self, delay: float = BASE_DELAY, timeout: int = 15):
         self.delay = delay
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update(self.HEADERS)
     
-    def get_article_links(self, page_url: str, limit: int = 5) -> List[str]:
+    def get_article_links(self, page_url: str, limit: int = ARTICLES_PER_SECTION) -> List[str]:
         """
         Получает список ссылок на статьи с указанной страницы
-        
-        :param page_url: URL страницы для парсинга
-        :param limit: Максимальное количество ссылок
-        :return: Список абсолютных URL статей
         """
         try:
             resp = self.session.get(page_url, timeout=self.timeout)
@@ -47,43 +48,69 @@ class HabrParser:
             soup = BeautifulSoup(resp.text, 'lxml')
             
             links = []
-            
-            # Основной селектор для ссылок на статьи
-            for a in soup.select('a.tm-title__link')[:limit * 2]:  # Берем с запасом
+            for a in soup.select('a.tm-title__link')[:limit * 2]:
                 href = a.get('href', '')
                 if href:
-                    # Преобразуем относительные ссылки в абсолютные
                     if href.startswith('/'):
                         full_url = self.BASE_URL + href
                     else:
                         full_url = href
                     
-                    # Проверяем, что это статья
                     if '/articles/' in full_url and full_url not in links:
                         links.append(full_url)
                         if len(links) >= limit:
                             break
             
-            print(f"[INFO] Найдено {len(links)} уникальных ссылок на статьи с {page_url}")
+            print(f"Найдено {len(links)} ссылок на статьи с {page_url}")
             return links[:limit]
             
         except Exception as e:
-            print(f"[ERROR] Ошибка при получении ссылок с {page_url}: {e}")
+            print(f"Ошибка при получении ссылок с {page_url}: {e}")
             return []
+    
+    def get_article_links_with_pagination(self, base_url: str, max_articles: int = MAX_ARTICLES) -> List[str]:
+        """
+        Собирает ссылки на статьи с нескольких страниц (пагинация)
+        """
+        all_links = []
+        page_num = 1
+        
+        while len(all_links) < max_articles and page_num <= PAGES_TO_CHECK:
+            if page_num == 1:
+                page_url = base_url
+            else:
+                page_url = f"{base_url}page{page_num}/"
+            
+            print(f"Парсим страницу {page_num}: {page_url}")
+            
+            try:
+                links = self.get_article_links(page_url, limit=ARTICLES_PER_PAGE)
+                new_links = [link for link in links if link not in all_links]
+                all_links.extend(new_links)
+                
+                print(f"Найдено {len(new_links)} новых ссылок. Всего: {len(all_links)}")
+                
+                if len(new_links) == 0:
+                    print("Новые ссылки не найдены. Прекращаем парсинг.")
+                    break
+                    
+            except Exception as e:
+                print(f"Ошибка при парсинге страницы {page_num}: {e}")
+            
+            time.sleep(self.delay + random.uniform(0, MAX_RANDOM_DELAY))
+            page_num += 1
+        
+        return all_links[:max_articles]
     
     def parse_article(self, url: str) -> Dict:
         """
         Парсит статью по URL
-        
-        :param url: URL статьи
-        :return: Словарь с данными статьи
         """
         try:
             resp = self.session.get(url, timeout=self.timeout)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, 'html.parser')
             
-            # 1. Заголовок
             title = ''
             title_tag = soup.select_one('h1.tm-title')
             if title_tag:
@@ -93,34 +120,27 @@ class HabrParser:
                 else:
                     title = title_tag.get_text(strip=True)
             
-            # 2. Автор
             author = ''
             author_tag = soup.select_one('a.tm-user-info__username')
             if author_tag:
                 author = author_tag.get_text(strip=True).lstrip('@')
             
-            # 3. Дата публикации
             date = ''
             time_tag = soup.find('time')
             if time_tag and time_tag.get('datetime'):
                 date = time_tag['datetime']
             
-            # 4. Текст статьи
             text = ''
-            
-            # Ищем блок с текстом статьи (версии 1 и 2)
             article_body = None
             for version in ['version-2', 'version-1']:
                 article_body = soup.select_one(f'div.article-formatted-body_version-{version}')
                 if article_body:
                     break
             
-            # Если не нашли по версиям, ищем общий класс
             if not article_body:
                 article_body = soup.select_one('div.article-formatted-body')
             
             if article_body:
-                # Извлекаем текст из всех параграфов
                 paragraphs = article_body.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
                 text_parts = []
                 for elem in paragraphs:
@@ -129,14 +149,11 @@ class HabrParser:
                         text_parts.append(elem_text)
                 text = ' '.join(text_parts)
             
-            # Очистка текста
-            text = self._clean_text(text)
+            text = clean_html(text)
             
-            # 5. Теги
             tags = []
             tag_list_div = soup.select_one('div.tag-list')
             if tag_list_div:
-                # Ищем все ссылки внутри блока тегов
                 for link in tag_list_div.select('a.link'):
                     span_tag = link.find('span')
                     if span_tag:
@@ -144,8 +161,6 @@ class HabrParser:
                         if tag_text and tag_text not in tags:
                             tags.append(tag_text)
             
-            # 6. Дополнительные метаданные
-            # Просмотры
             views = 0
             views_elem = soup.select_one('span.tm-icon-counter__value')
             if views_elem:
@@ -158,7 +173,6 @@ class HabrParser:
                 except:
                     views = 0
             
-            # Рейтинг
             rating = 0
             rating_elem = soup.select_one('span.tm-votes-lever__score-counter')
             if rating_elem:
@@ -168,13 +182,6 @@ class HabrParser:
                 except:
                     rating = 0
             
-            # Время чтения
-            reading_time = ''
-            reading_time_elem = soup.select_one('span.tm-article-reading-time__label')
-            if reading_time_elem:
-                reading_time = reading_time_elem.get_text(strip=True)
-            
-            # Уникальный ID статьи (на основе URL)
             article_id = f"habr_{hash(url) & 0xFFFFFFFF:08x}"
             
             return {
@@ -188,14 +195,13 @@ class HabrParser:
                 'source': 'Habr',
                 'views': views,
                 'rating': rating,
-                'reading_time': reading_time,
                 'parsed_at': datetime.now().isoformat(),
                 'text_length': len(text),
                 'has_content': len(text) > 100
             }
             
         except Exception as e:
-            print(f"[ERROR] Ошибка при парсинге статьи {url}: {e}")
+            print(f"Ошибка при парсинге статьи {url}: {e}")
             return {
                 'id': f"habr_error_{hash(url) & 0xFFFFFFFF:08x}",
                 'title': '',
@@ -207,7 +213,6 @@ class HabrParser:
                 'source': 'Habr',
                 'views': 0,
                 'rating': 0,
-                'reading_time': '',
                 'parsed_at': datetime.now().isoformat(),
                 'text_length': 0,
                 'has_content': False,
@@ -217,17 +222,13 @@ class HabrParser:
     def parse_articles(self, urls: List[str]) -> List[Dict]:
         """
         Парсит несколько статей с задержками
-        
-        :param urls: Список URL статей
-        :return: Список словарей с данными статей
         """
         articles = []
         total = len(urls)
         
         for i, url in enumerate(urls, 1):
-            # Задержка для избежания блокировки
             if i > 1:
-                sleep_time = self.delay + random.uniform(0, 1.0)
+                sleep_time = self.delay + random.uniform(0, MAX_RANDOM_DELAY)
                 time.sleep(sleep_time)
             
             print(f"[{i}/{total}] Парсинг: {url[:80]}...")
@@ -235,73 +236,21 @@ class HabrParser:
             
             if article.get('has_content'):
                 articles.append(article)
-                print(f"     ✓ {article['title'][:60]}...")
-                print(f"       Автор: {article['author'] or 'Не указан'}, "
-                      f"Теги: {article['tags'][:3] or 'Нет'}, "
-                      f"Символов: {article['text_length']}")
+                print(f"Успешно: {article['title'][:60]}...")
+                print(f"Автор: {article['author'] or 'Не указан'}, Теги: {article['tags'][:3] or 'Нет'}, Символов: {article['text_length']}")
             else:
-                print(f"     ✗ Статья не содержит достаточно текста")
+                print(f"Статья не содержит достаточно текста")
         
         return articles
-    
-    def get_articles_from_page(self, page_url: str, limit: int = 5) -> List[Dict]:
-        """
-        Полный цикл: получение ссылок + парсинг статей
-        
-        :param page_url: URL страницы со статьями
-        :param limit: Количество статей для парсинга
-        :return: Список статей
-        """
-        print(f"\n{'='*60}")
-        print(f"Начинаем парсинг страницы: {page_url}")
-        print('='*60)
-        
-        # Получаем ссылки на статьи
-        links = self.get_article_links(page_url, limit=limit)
-        
-        if not links:
-            print("[WARNING] Не найдено ссылок на статьи")
-            return []
-        
-        # Парсим статьи
-        articles = self.parse_articles(links)
-        
-        print(f"\n[ИТОГО] Успешно спаршено: {len(articles)} из {len(links)} статей")
-        return articles
-    
-    def _clean_text(self, text: str) -> str:
-        """
-        Очистка текста
-        
-        :param text: Исходный текст
-        :return: Очищенный текст
-        """
-        if not text:
-            return ''
-        
-        # Убираем HTML-сущности
-        text = text.replace('&nbsp;', ' ').replace('&amp;', '&')
-        
-        # Убираем лишние пробелы и переносы строк
-        text = re.sub(r'\s+', ' ', text)
-        
-        # Убираем специальные символы, но сохраняем кириллицу и пунктуацию
-        text = re.sub(r'[^\w\s.,!?:;()\-—«»"\'`\u0400-\u04FF]', ' ', text, flags=re.UNICODE)
-        
-        return text.strip()
     
     def save_to_jsonl(self, articles: List[Dict], filename: str):
         """
         Сохраняет статьи в формате JSONL
-        
-        :param articles: Список статей
-        :param filename: Имя файла для сохранения
         """
-        import os
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         
         with open(filename, 'w', encoding='utf-8') as f:
             for article in articles:
                 f.write(json.dumps(article, ensure_ascii=False) + '\n')
         
-        print(f"[SAVED] Сохранено {len(articles)} статей в {filename}")
+        print(f"Сохранено {len(articles)} статей в {filename}")
