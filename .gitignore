@@ -7,7 +7,6 @@ venv/
 env/
 
 # Данные и модели
-data/articles_*.jsonl
 parser_articles/data/mass_parse_results/
 parser_articles/data/progress.json
 chroma_db/
