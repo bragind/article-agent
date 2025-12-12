@@ -1,12 +1,29 @@
 version: '3.8'
 
 services:
-  article-agent:
+  web:
     build: .
+    container_name: rag-agent-web
     ports:
       - "8501:8501"
     volumes:
-      - ./chroma_db:/app/chroma_db
-      - ./models:/app/models:ro
-    env_file:
-      - .env
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+    restart: unless-stopped
+    command: streamlit run app.py --server.port=8501 --server.address=0.0.0.0
+
+  bot:
+    build: .
+    container_name: rag-agent-bot
+    command: python src/bot.py
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      - web
