@@ -7,13 +7,13 @@ from unittest.mock import Mock, AsyncMock, patch, MagicMock
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Мокаем aiogram и другие зависимости
-sys.modules['aiogram'] = Mock()
-sys.modules['aiogram.filters'] = Mock()
-sys.modules['aiogram.types'] = Mock()
-sys.modules['aiogram.enums'] = Mock()
-sys.modules['aiogram.utils.keyboard'] = Mock()
-sys.modules['aiogram.client.default'] = Mock()
-sys.modules['pdfplumber'] = Mock()
+sys.modules["aiogram"] = Mock()
+sys.modules["aiogram.filters"] = Mock()
+sys.modules["aiogram.types"] = Mock()
+sys.modules["aiogram.enums"] = Mock()
+sys.modules["aiogram.utils.keyboard"] = Mock()
+sys.modules["aiogram.client.default"] = Mock()
+sys.modules["pdfplumber"] = Mock()
 
 
 def test_bot_import():
@@ -21,9 +21,9 @@ def test_bot_import():
     try:
         # Пытаемся импортировать только функции, не запуская весь скрипт
         import importlib.util
+
         spec = importlib.util.spec_from_file_location(
-            "bot",
-            Path(__file__).parent.parent / "src" / "bot.py"
+            "bot", Path(__file__).parent.parent / "src" / "bot.py"
         )
         bot_module = importlib.util.module_from_spec(spec)
 
@@ -54,16 +54,22 @@ def test_clean_text_function():
 
         # Обрезаем до максимальной длины Telegram
         if len(text) > max_length:
-            text = text[:max_length - 3] + "..."
+            text = text[: max_length - 3] + "..."
 
         if keep_links:
             # Сохраняем Markdown ссылки, убираем только опасные символы
-            problem_chars = ['`', '*', '_', '~']
+            problem_chars = ["`", "*", "_", "~"]
             for char in problem_chars:
-                text = text.replace(char, '')
+                text = text.replace(char, "")
         else:
             # Старая логика - убираем всё
-            text = text.replace('`', "'").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
+            text = (
+                text.replace("`", "'")
+                .replace("*", "")
+                .replace("_", "")
+                .replace("[", "(")
+                .replace("]", ")")
+            )
 
         return text
 
@@ -120,16 +126,12 @@ def test_keyboard_generation():
 
         def as_markup(self, resize_keyboard=True):
             return ReplyKeyboardMarkup(
-                keyboard=[[b] for b in self.buttons],
-                resize_keyboard=resize_keyboard
+                keyboard=[[b] for b in self.buttons], resize_keyboard=resize_keyboard
             )
 
     # Тестируем создание клавиатуры
     builder = ReplyKeyboardBuilder()
-    builder.row(
-        KeyboardButton("🔍 Поиск"),
-        KeyboardButton("📁 Мои документы")
-    )
+    builder.row(KeyboardButton("🔍 Поиск"), KeyboardButton("📁 Мои документы"))
 
     markup = builder.as_markup(resize_keyboard=True)
 
@@ -174,9 +176,18 @@ def test_button_detection():
     """Тест определения кнопок"""
 
     # Копируем логику из бота
-    button_texts = ["🔍 Поиск", "📁 Мои документы", "⚙️ Настройки", "📊 Статистика",
-                    "❓ Помощь", "🏠 Главное меню", "⬅️ Назад", "🔎 Везде",
-                    "🌐 Только Habr", "📄 Загрузить PDF"]
+    button_texts = [
+        "🔍 Поиск",
+        "📁 Мои документы",
+        "⚙️ Настройки",
+        "📊 Статистика",
+        "❓ Помощь",
+        "🏠 Главное меню",
+        "⬅️ Назад",
+        "🔎 Везде",
+        "🌐 Только Habr",
+        "📄 Загрузить PDF",
+    ]
 
     def is_button(text):
         return text in button_texts
@@ -215,7 +226,7 @@ def test_scope_text_conversion():
     assert get_scope_text("unknown") == ""
 
 
-@patch('aiogram.Bot')
+@patch("aiogram.Bot")
 def test_bot_commands(mock_bot_class):
     """Тест обработки команд бота"""
 
@@ -231,6 +242,7 @@ def test_bot_commands(mock_bot_class):
 
     # Тестируем
     import asyncio
+
     response = asyncio.run(handle_start_command(mock_message))
 
     assert "12345" in response or "пользователь" in response
@@ -245,7 +257,7 @@ def test_pdf_processing():
             "filename": filename,
             "size": content_length,
             "pages": 1 if content_length > 0 else 0,
-            "is_valid": filename.endswith('.pdf') and content_length > 0
+            "is_valid": filename.endswith(".pdf") and content_length > 0,
         }
 
     # Тестируем

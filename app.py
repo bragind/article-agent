@@ -27,11 +27,11 @@ st.set_page_config(
     page_title="📚 AI RAG-агент",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # ==================== ИНИЦИАЛИЗАЦИЯ СЕССИИ ====================
-if 'rag_agent' not in st.session_state:
+if "rag_agent" not in st.session_state:
     if RAGAgent:
         try:
             st.session_state.rag_agent = RAGAgent(data_dir="data")
@@ -47,7 +47,7 @@ if 'rag_agent' not in st.session_state:
     st.session_state.stats_loaded = False
     st.session_state.search_scope = "all"  # По умолчанию: ищем везде
 
-if 'user_id' not in st.session_state:
+if "user_id" not in st.session_state:
     # Для демо используем хеш
     st.session_state.user_id = hashlib.md5("demo_user".encode()).hexdigest()[:8]
 
@@ -67,15 +67,19 @@ def load_pdf_file(uploaded_file) -> Dict[str, Any]:
                 page_text = page.extract_text() or ""
                 full_text += f"\n\n--- Страница {page_num} ---\n{page_text}"
 
-                pages_data.append({
-                    "page_number": page_num,
-                    "text": page_text,
-                    "char_count": len(page_text),
-                    "word_count": len(page_text.split())
-                })
+                pages_data.append(
+                    {
+                        "page_number": page_num,
+                        "text": page_text,
+                        "char_count": len(page_text),
+                        "word_count": len(page_text.split()),
+                    }
+                )
 
             article_data = {
-                "title": uploaded_file.name.replace(".pdf", "").replace("_", " ").title(),
+                "title": uploaded_file.name.replace(".pdf", "")
+                .replace("_", " ")
+                .title(),
                 "author": "",
                 "date": datetime.now().isoformat(),
                 "text": full_text.strip(),
@@ -88,7 +92,7 @@ def load_pdf_file(uploaded_file) -> Dict[str, Any]:
                 "text_length": len(full_text.strip()),
                 "has_content": len(full_text.strip()) > 100,
                 "pages": pages_data,
-                "uploaded_by": st.session_state.user_id
+                "uploaded_by": st.session_state.user_id,
             }
 
             return article_data
@@ -117,7 +121,7 @@ with st.sidebar:
     st.title("🤖 AI RAG-агент")
     st.markdown("---")
 
-    if not st.session_state.get('initialized', False):
+    if not st.session_state.get("initialized", False):
         st.error("RAG агент не инициализирован")
         if st.button("Попробовать снова"):
             try:
@@ -133,8 +137,12 @@ with st.sidebar:
     search_scope = st.selectbox(
         "Где искать:",
         options=["🔎 Везде", "📁 Только мои документы", "🌐 Только Habr"],
-        index=0 if st.session_state.search_scope == "all" else 1 if st.session_state.search_scope == "user" else 2,
-        key="search_scope_select"
+        index=(
+            0
+            if st.session_state.search_scope == "all"
+            else 1 if st.session_state.search_scope == "user" else 2
+        ),
+        key="search_scope_select",
     )
 
     # Сохраняем выбор
@@ -149,7 +157,7 @@ with st.sidebar:
     scope_info = {
         "all": "🔍 Поиск по всем источникам (ваши документы + Habr)",
         "user": "📁 Поиск только по вашим документам",
-        "habr": "🌐 Поиск только по статьям Habr"
+        "habr": "🌐 Поиск только по статьям Habr",
     }
     st.info(scope_info[st.session_state.search_scope])
 
@@ -175,9 +183,7 @@ with st.sidebar:
     # Загрузка документов
     st.subheader("📁 Загрузить документы")
     uploaded_file = st.file_uploader(
-        "Выберите PDF файл",
-        type=['pdf'],
-        help="Максимальный размер: 100MB"
+        "Выберите PDF файл", type=["pdf"], help="Максимальный размер: 100MB"
     )
 
     if uploaded_file is not None:
@@ -185,16 +191,20 @@ with st.sidebar:
             with st.spinner("Обработка PDF..."):
                 article_data = load_pdf_file(uploaded_file)
 
-                if article_data and article_data.get('has_content'):
+                if article_data and article_data.get("has_content"):
                     article_id = st.session_state.rag_agent.add_user_article(
-                        article_data,
-                        st.session_state.user_id
+                        article_data, st.session_state.user_id
                     )
 
                     if article_id:
-                        st.success(f"✅ Документ '{article_data['title'][:30]}...' добавлен!")
-                        st.session_state.user_documents = st.session_state.rag_agent.get_user_articles(
-                            st.session_state.user_id)
+                        st.success(
+                            f"✅ Документ '{article_data['title'][:30]}...' добавлен!"
+                        )
+                        st.session_state.user_documents = (
+                            st.session_state.rag_agent.get_user_articles(
+                                st.session_state.user_id
+                            )
+                        )
                         st.rerun()
                     else:
                         st.error("❌ Ошибка при добавлении документа")
@@ -223,11 +233,12 @@ with st.sidebar:
             st.rerun()
 
     st.markdown("---")
-    st.caption("© 2024 Cloud.ru AI Agent")
+    st.caption("© 2025 DreamTeam AI Agent")
 
 # ==================== ГЛАВНАЯ СТРАНИЦА ====================
 st.title("📚 AI RAG-агент для поиска статей")
-st.markdown("""
+st.markdown(
+    """
     *Интеллектуальный поиск и анализ IT-статей с выбором области поиска*
 
     **📊 Текущая область поиска:**
@@ -236,31 +247,27 @@ st.markdown("""
     - 🌐 Только Habr - только статьи Habr
 
     **💡 Измените область поиска в боковой панели слева**
-""")
+"""
+)
 
 # Разделитель
 st.markdown("---")
 
 # ==================== ВКЛАДКИ ====================
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🔍 Поиск",
-    "💬 Чат",
-    "📚 Мои документы",
-    "📊 Статистика"
-])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["🔍 Поиск", "💬 Чат", "📚 Мои документы", "📊 Статистика"]
+)
 
 # ==================== ВКЛАДКА 1: ПОИСК ====================
 with tab1:
     st.header("🔍 Интеллектуальный поиск")
 
     # Отображение текущей области поиска
-    scope_emoji = {
-        "all": "🔎",
-        "user": "📁",
-        "habr": "🌐"
-    }
+    scope_emoji = {"all": "🔎", "user": "📁", "habr": "🌐"}
 
-    st.info(f"{scope_emoji[st.session_state.search_scope]} **Ищу: {scope_info[st.session_state.search_scope]}**")
+    st.info(
+        f"{scope_emoji[st.session_state.search_scope]} **Ищу: {scope_info[st.session_state.search_scope]}**"
+    )
 
     # Поле поиска
     col1, col2 = st.columns([3, 1])
@@ -269,7 +276,7 @@ with tab1:
         search_query = st.text_input(
             "Введите запрос для поиска",
             placeholder="Например: Как работает RAG архитектура?",
-            key="search_input"
+            key="search_input",
         )
 
     with col2:
@@ -277,7 +284,9 @@ with tab1:
             pass  # Кнопка для триггера
 
     if search_query:
-        with st.spinner(f"🔍 Ищу {scope_info[st.session_state.search_scope].split()[0]}..."):
+        with st.spinner(
+            f"🔍 Ищу {scope_info[st.session_state.search_scope].split()[0]}..."
+        ):
             # Получаем область поиска
             scope = get_scope_enum(st.session_state.search_scope)
 
@@ -287,12 +296,13 @@ with tab1:
                     search_query,
                     st.session_state.user_id,
                     scope=scope,
-                    limit=search_limit
+                    limit=search_limit,
                 )
 
                 if not search_results:
                     st.warning(
-                        f"📭 По вашему запросу ничего не найдено {scope_info[st.session_state.search_scope].split()[0]}")
+                        f"📭 По вашему запросу ничего не найдено {scope_info[st.session_state.search_scope].split()[0]}"
+                    )
                 else:
                     # Показываем результаты
                     st.success(f"✅ Найдено {len(search_results)} результатов")
@@ -301,9 +311,7 @@ with tab1:
                     with st.expander("📝 Краткая сводка", expanded=True):
                         # Генерируем ответ
                         result = st.session_state.rag_agent.generate_answer(
-                            search_query,
-                            st.session_state.user_id,
-                            scope
+                            search_query, st.session_state.user_id, scope
                         )
                         st.markdown(result["answer"])
 
@@ -311,24 +319,33 @@ with tab1:
                     st.subheader("📚 Найденные материалы")
 
                     for i, result in enumerate(search_results, 1):
-                        article = result['article']
-                        source_type = "📁 Ваш документ" if result['is_user_document'] else "🌐 Habr"
+                        article = result["article"]
+                        source_type = (
+                            "📁 Ваш документ"
+                            if result["is_user_document"]
+                            else "🌐 Habr"
+                        )
 
                         with st.container():
                             col_a, col_b = st.columns([4, 1])
 
                             with col_a:
                                 st.markdown(f"**{i}. {article['title']}**")
-                                st.caption(f"{source_type} • {article.get('author', 'Не указан')} • "
-                                           f"{article.get('date', '')[:10] if article.get('date') else 'Нет даты'}")
+                                st.caption(
+                                    f"{source_type} • {article.get('author', 'Не указан')} • "
+                                    f"{article.get('date', '')[:10] if article.get('date') else 'Нет даты'}"
+                                )
 
                                 # Краткий превью текста
-                                preview = article['text'][:200] + "..." if len(article['text']) > 200 else article[
-                                    'text']
+                                preview = (
+                                    article["text"][:200] + "..."
+                                    if len(article["text"]) > 200
+                                    else article["text"]
+                                )
                                 st.markdown(f"*{preview}*")
 
                                 # Теги
-                                tags = article.get('tags', [])
+                                tags = article.get("tags", [])
                                 if tags:
                                     tag_cols = st.columns(min(len(tags), 5))
                                     for idx, tag in enumerate(tags[:5]):
@@ -336,19 +353,28 @@ with tab1:
                                             st.markdown(f"`{tag}`")
 
                             with col_b:
-                                st.metric("Символов", f"{article.get('text_length', 0):,}")
-                                relevance = result['score']
-                                st.progress(min(relevance / 10, 1.0), text=f"Релевантность: {relevance:.1f}")
+                                st.metric(
+                                    "Символов", f"{article.get('text_length', 0):,}"
+                                )
+                                relevance = result["score"]
+                                st.progress(
+                                    min(relevance / 10, 1.0),
+                                    text=f"Релевантность: {relevance:.1f}",
+                                )
 
                                 # Кнопки действий
                                 col_btn1, col_btn2 = st.columns(2)
                                 with col_btn1:
                                     if st.button("📋 Копировать", key=f"copy_{i}"):
-                                        st.toast(f"Ссылка скопирована: {article['url']}")
+                                        st.toast(
+                                            f"Ссылка скопирована: {article['url']}"
+                                        )
                                 with col_btn2:
                                     if st.button("🔗 Открыть", key=f"open_{i}"):
-                                        if not article['url'].startswith('file://'):
-                                            st.markdown(f"[Открыть ссылку]({article['url']})")
+                                        if not article["url"].startswith("file://"):
+                                            st.markdown(
+                                                f"[Открыть ссылку]({article['url']})"
+                                            )
 
                             st.markdown("---")
 
@@ -359,25 +385,33 @@ with tab1:
                         # Находим похожие статьи
                         similar_articles = []
                         for result in search_results[:3]:
-                            article = result['article']
-                            tags = article.get('tags', [])
+                            article = result["article"]
+                            tags = article.get("tags", [])
                             if tags:
                                 # Ищем статьи с похожими тегами
                                 for other in st.session_state.rag_agent.all_articles:
-                                    if other['id'] != article['id'] and any(
-                                            tag in other.get('tags', []) for tag in tags):
-                                        if other not in similar_articles and len(similar_articles) < 5:
+                                    if other["id"] != article["id"] and any(
+                                        tag in other.get("tags", []) for tag in tags
+                                    ):
+                                        if (
+                                            other not in similar_articles
+                                            and len(similar_articles) < 5
+                                        ):
                                             similar_articles.append(other)
 
                         if similar_articles:
                             for article in similar_articles[:3]:
                                 with st.container():
                                     st.markdown(f"**{article['title']}**")
-                                    st.caption(f"Похоже на ваш запрос • {article.get('source', 'Unknown')}")
-                                    if not article['url'].startswith('file://'):
+                                    st.caption(
+                                        f"Похоже на ваш запрос • {article.get('source', 'Unknown')}"
+                                    )
+                                    if not article["url"].startswith("file://"):
                                         st.markdown(f"[Открыть]({article['url']})")
                         else:
-                            st.info("Попробуйте уточнить запрос для получения рекомендаций")
+                            st.info(
+                                "Попробуйте уточнить запрос для получения рекомендаций"
+                            )
 
 # ==================== ВКЛАДКА 2: ЧАТ ====================
 with tab2:
@@ -387,7 +421,7 @@ with tab2:
     chat_scope = st.selectbox(
         "Область поиска для чата:",
         options=["🔎 Везде", "📁 Только мои документы", "🌐 Только Habr"],
-        key="chat_scope"
+        key="chat_scope",
     )
 
     # Конвертируем в SearchScope
@@ -399,11 +433,11 @@ with tab2:
 
     # Отображаем историю чата
     for message in st.session_state.chat_history:
-        with st.chat_message(message['role']):
-            st.markdown(message['content'])
-            if message.get('sources'):
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if message.get("sources"):
                 with st.expander("📚 Показать источники"):
-                    for source in message['sources']:
+                    for source in message["sources"]:
                         st.markdown(f"• {source['title']}")
 
     # Поле ввода
@@ -411,44 +445,46 @@ with tab2:
 
     if chat_input:
         # Добавляем сообщение пользователя
-        st.session_state.chat_history.append({
-            'role': 'user',
-            'content': chat_input,
-            'timestamp': datetime.now().isoformat()
-        })
+        st.session_state.chat_history.append(
+            {
+                "role": "user",
+                "content": chat_input,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
 
-        with st.chat_message('user'):
+        with st.chat_message("user"):
             st.markdown(chat_input)
 
         # Получаем ответ
         with st.spinner(f"🤔 AI-агент думает ({chat_scope})..."):
             result = st.session_state.rag_agent.generate_answer(
-                chat_input,
-                st.session_state.user_id,
-                chat_scope_enum
+                chat_input, st.session_state.user_id, chat_scope_enum
             )
 
             # Добавляем ответ в историю
-            st.session_state.chat_history.append({
-                'role': 'assistant',
-                'content': result["answer"],
-                'sources': result["sources"],
-                'questions': result["questions"],
-                'timestamp': datetime.now().isoformat()
-            })
+            st.session_state.chat_history.append(
+                {
+                    "role": "assistant",
+                    "content": result["answer"],
+                    "sources": result["sources"],
+                    "questions": result["questions"],
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
 
             # Отображаем ответ
-            with st.chat_message('assistant'):
+            with st.chat_message("assistant"):
                 st.markdown(result["answer"])
 
                 if result["sources"]:
                     with st.expander("📚 Показать источники", expanded=False):
                         for i, source in enumerate(result["sources"], 1):
-                            icon = "📁" if source.get('is_user_document') else "🌐"
+                            icon = "📁" if source.get("is_user_document") else "🌐"
                             st.markdown(f"{i}. {icon} **{source['title']}**")
 
             # Вопросы для самопроверки
-            if result.get('questions'):
+            if result.get("questions"):
                 with st.expander("❓ Вопросы для самопроверки", expanded=True):
                     for question in result["questions"]:
                         st.markdown(f"• {question}")
@@ -462,7 +498,8 @@ with tab3:
     st.session_state.user_documents = user_docs
 
     if not user_docs:
-        st.info("""
+        st.info(
+            """
         📭 **У вас пока нет загруженных документов.**
 
         **Как добавить документы:**
@@ -475,10 +512,11 @@ with tab3:
         • Искать только по своим документам
         • Использовать область поиска "📁 Только мои документы"
         • Анализировать содержимое документов
-        """)
+        """
+        )
     else:
         # Статистика документов
-        total_chars = sum(len(doc.get('text', '')) for doc in user_docs)
+        total_chars = sum(len(doc.get("text", "")) for doc in user_docs)
         avg_chars = total_chars // len(user_docs)
 
         col1, col2, col3 = st.columns(3)
@@ -495,7 +533,7 @@ with tab3:
         quick_search = st.text_input(
             "Поиск в ваших документах",
             placeholder="Введите ключевые слова...",
-            key="quick_search"
+            key="quick_search",
         )
 
         if quick_search:
@@ -504,17 +542,17 @@ with tab3:
                 quick_search,
                 st.session_state.user_id,
                 scope=SearchScope.USER_ONLY,
-                limit=10
+                limit=10,
             )
 
             if search_results:
                 st.success(f"✅ Найдено {len(search_results)} совпадений")
                 for result in search_results:
-                    article = result['article']
+                    article = result["article"]
                     with st.expander(f"📄 {article['title']}"):
                         st.markdown(f"**Символов:** {article.get('text_length', 0):,}")
                         # Показываем контекст совпадения
-                        text = article.get('text', '')
+                        text = article.get("text", "")
                         if quick_search.lower() in text.lower():
                             idx = text.lower().find(quick_search.lower())
                             start = max(0, idx - 100)
@@ -534,14 +572,16 @@ with tab3:
         # Создаем DataFrame для отображения
         docs_data = []
         for doc in user_docs:
-            docs_data.append({
-                "Название": doc.get('title', 'Без названия'),
-                "Автор": doc.get('author', 'Не указан'),
-                "Дата": doc.get('uploaded_at', doc.get('date', ''))[:10],
-                "Символов": doc.get('text_length', 0),
-                "Страниц": len(doc.get('pages', [])),
-                "Теги": ', '.join(doc.get('tags', [])[:3])
-            })
+            docs_data.append(
+                {
+                    "Название": doc.get("title", "Без названия"),
+                    "Автор": doc.get("author", "Не указан"),
+                    "Дата": doc.get("uploaded_at", doc.get("date", ""))[:10],
+                    "Символов": doc.get("text_length", 0),
+                    "Страниц": len(doc.get("pages", [])),
+                    "Теги": ", ".join(doc.get("tags", [])[:3]),
+                }
+            )
 
         if docs_data:
             df = pd.DataFrame(docs_data)
@@ -552,8 +592,8 @@ with tab3:
                 column_config={
                     "Название": st.column_config.TextColumn(width="large"),
                     "Символов": st.column_config.NumberColumn(format="%d"),
-                    "Теги": st.column_config.TextColumn(width="medium")
-                }
+                    "Теги": st.column_config.TextColumn(width="medium"),
+                },
             )
 
 # ==================== ВКЛАДКА 4: СТАТИСТИКА ====================
@@ -567,13 +607,13 @@ with tab4:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        st.metric("Всего документов", stats['total_articles'])
+        st.metric("Всего документов", stats["total_articles"])
     with col2:
-        st.metric("Статей Habr", stats['habr_articles'])
+        st.metric("Статей Habr", stats["habr_articles"])
     with col3:
-        st.metric("Пользовательских", stats['user_articles'])
+        st.metric("Пользовательских", stats["user_articles"])
     with col4:
-        st.metric("Ваших документов", stats['current_user_articles'])
+        st.metric("Ваших документов", stats["current_user_articles"])
 
     st.markdown("---")
 
@@ -585,15 +625,15 @@ with tab4:
         st.subheader("📈 Распределение по источникам")
 
         sources_data = {
-            'Habr': stats['habr_articles'],
-            'Пользовательские': stats['user_articles']
+            "Habr": stats["habr_articles"],
+            "Пользовательские": stats["user_articles"],
         }
 
         fig = px.pie(
             values=list(sources_data.values()),
             names=list(sources_data.keys()),
             title="Источники документов",
-            color_discrete_sequence=px.colors.qualitative.Set3
+            color_discrete_sequence=px.colors.qualitative.Set3,
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -601,14 +641,14 @@ with tab4:
         # Диаграмма пользовательских документов
         st.subheader("👤 Ваши документы")
 
-        if stats['current_user_articles'] > 0:
+        if stats["current_user_articles"] > 0:
             fig = px.bar(
-                x=['Ваши документы'],
-                y=[stats['current_user_articles']],
+                x=["Ваши документы"],
+                y=[stats["current_user_articles"]],
                 title="Количество ваших документов",
-                labels={'x': '', 'y': 'Количество'}
+                labels={"x": "", "y": "Количество"},
             )
-            fig.update_traces(marker_color='green')
+            fig.update_traces(marker_color="green")
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("У вас пока нет документов")
@@ -619,7 +659,7 @@ with tab4:
     sys_info = {
         "ID пользователя": st.session_state.user_id,
         "Область поиска по умолчанию": scope_info[st.session_state.search_scope],
-        "Обновлено": stats['last_update'][:19]
+        "Обновлено": stats["last_update"][:19],
     }
 
     for key, value in sys_info.items():
@@ -627,16 +667,20 @@ with tab4:
 
 # ==================== ФУТЕР ====================
 st.markdown("---")
-st.markdown("""
+st.markdown(
+    """
 <div style="text-align: center">
     <p>📚 <strong>AI RAG-агент dreamteam___.ru</strong> | Версия 1.0.0</p>
     <p>🤖 Интеллектуальный поиск и анализ IT-статей</p>
     <p>📧 Поддержка: support@dreamteam____.ru | 📞 +7 (XXX) XXX-XX-XX</p>
 </div>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # ==================== СТИЛИ CSS ====================
-st.markdown("""
+st.markdown(
+    """
 <style>
     .stButton > button {
         width: 100%;
@@ -667,4 +711,6 @@ st.markdown("""
         color: white;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)

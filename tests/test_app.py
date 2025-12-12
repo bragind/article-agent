@@ -9,10 +9,10 @@ from unittest.mock import Mock, patch, MagicMock
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Мокаем Streamlit и другие зависимости перед импортом
-sys.modules['streamlit'] = Mock()
-sys.modules['plotly.express'] = Mock()
-sys.modules['plotly.graph_objects'] = Mock()
-sys.modules['pandas'] = Mock()
+sys.modules["streamlit"] = Mock()
+sys.modules["plotly.express"] = Mock()
+sys.modules["plotly.graph_objects"] = Mock()
+sys.modules["pandas"] = Mock()
 
 
 # Создаем мок для RAGAgent
@@ -33,7 +33,7 @@ class MockRAGAgent:
             "questions": [],
             "found_in_user_docs": False,
             "total_found": 0,
-            "scope": "all"
+            "scope": "all",
         }
 
     def get_user_articles(self, user_id):
@@ -48,14 +48,14 @@ class MockRAGAgent:
             "habr_articles": 0,
             "user_articles": 0,
             "current_user_articles": 0,
-            "last_update": "2024-01-01"
+            "last_update": "2024-01-01",
         }
 
 
 # Мокаем RAGAgent
-sys.modules['rag'] = Mock()
-sys.modules['rag'].RAGAgent = MockRAGAgent
-sys.modules['rag'].SearchScope = Mock()
+sys.modules["rag"] = Mock()
+sys.modules["rag"].RAGAgent = MockRAGAgent
+sys.modules["rag"].SearchScope = Mock()
 
 
 def test_app_import():
@@ -63,9 +63,9 @@ def test_app_import():
     try:
         # Пытаемся импортировать модуль
         import importlib.util
+
         spec = importlib.util.spec_from_file_location(
-            "app",
-            Path(__file__).parent.parent / "src" / "app.py"
+            "app", Path(__file__).parent.parent / "src" / "app.py"
         )
         app_module = importlib.util.module_from_spec(spec)
 
@@ -95,7 +95,7 @@ def test_app_functions():
             return {
                 "title": uploaded_file.name.replace(".pdf", ""),
                 "text": "Тестовый текст",
-                "has_content": True
+                "has_content": True,
             }
         except Exception:
             return None
@@ -117,21 +117,18 @@ def test_app_state_management():
 
     # Имитируем состояние сессии
     session_state = {
-        'chat_history': [],
-        'user_documents': [],
-        'search_scope': 'all',
-        'user_id': 'test_user'
+        "chat_history": [],
+        "user_documents": [],
+        "search_scope": "all",
+        "user_id": "test_user",
     }
 
     # Тестируем операции с состоянием
-    session_state['chat_history'].append({
-        'role': 'user',
-        'content': 'тестовый запрос'
-    })
+    session_state["chat_history"].append({"role": "user", "content": "тестовый запрос"})
 
-    assert len(session_state['chat_history']) == 1
-    assert session_state['chat_history'][0]['role'] == 'user'
-    assert session_state['search_scope'] == 'all'
+    assert len(session_state["chat_history"]) == 1
+    assert session_state["chat_history"][0]["role"] == "user"
+    assert session_state["search_scope"] == "all"
 
 
 def test_app_scope_conversion():

@@ -22,8 +22,12 @@ from rag import RAGAgent, SearchScope
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
-    Message, InlineKeyboardMarkup, InlineKeyboardButton,
-    CallbackQuery, ReplyKeyboardMarkup, KeyboardButton
+    Message,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+    CallbackQuery,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
 )
 from aiogram.client.default import DefaultBotProperties
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
@@ -49,8 +53,7 @@ print(f"✅ Токен бота получен")
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -67,6 +70,7 @@ user_states = {}
 
 # ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
 
+
 def clean_text(text: str, max_length: int = 4000, keep_links: bool = False) -> str:
     """Очищает текст для отправки в Telegram"""
     if not text:
@@ -74,16 +78,22 @@ def clean_text(text: str, max_length: int = 4000, keep_links: bool = False) -> s
 
     # Обрезаем до максимальной длины Telegram
     if len(text) > max_length:
-        text = text[:max_length - 3] + "..."
+        text = text[: max_length - 3] + "..."
 
     if keep_links:
         # Сохраняем Markdown ссылки, убираем только опасные символы
-        problem_chars = ['`', '*', '_', '~']
+        problem_chars = ["`", "*", "_", "~"]
         for char in problem_chars:
-            text = text.replace(char, '')
+            text = text.replace(char, "")
     else:
         # Старая логика - убираем всё
-        text = text.replace('`', "'").replace('*', '').replace('_', '').replace('[', '(').replace(']', ')')
+        text = (
+            text.replace("`", "'")
+            .replace("*", "")
+            .replace("_", "")
+            .replace("[", "(")
+            .replace("]", ")")
+        )
 
     return text
 
@@ -101,23 +111,21 @@ def get_scope_text(scope: SearchScope) -> str:
 
 # ==================== КЛАВИАТУРЫ ====================
 
+
 def get_main_keyboard():
     """Основная клавиатура"""
     builder = ReplyKeyboardBuilder()
 
     builder.row(
-        KeyboardButton(text="🔍 Поиск"),
-        KeyboardButton(text="📁 Мои документы")
+        KeyboardButton(text="🔍 Поиск"), KeyboardButton(text="📁 Мои документы")
     )
 
     builder.row(
-        KeyboardButton(text="⚙️ Настройки"),
-        KeyboardButton(text="📊 Статистика")
+        KeyboardButton(text="⚙️ Настройки"), KeyboardButton(text="📊 Статистика")
     )
 
     builder.row(
-        KeyboardButton(text="❓ Помощь"),
-        KeyboardButton(text="🏠 Главное меню")
+        KeyboardButton(text="❓ Помощь"), KeyboardButton(text="🏠 Главное меню")
     )
 
     return builder.as_markup(resize_keyboard=True)
@@ -130,13 +138,10 @@ def get_search_keyboard():
     builder.row(
         KeyboardButton(text="🔎 Везде"),
         KeyboardButton(text="📁 Мои документы"),
-        KeyboardButton(text="🌐 Только Habr")
+        KeyboardButton(text="🌐 Только Habr"),
     )
 
-    builder.row(
-        KeyboardButton(text="📄 Загрузить PDF"),
-        KeyboardButton(text="⬅️ Назад")
-    )
+    builder.row(KeyboardButton(text="📄 Загрузить PDF"), KeyboardButton(text="⬅️ Назад"))
 
     return builder.as_markup(resize_keyboard=True)
 
@@ -154,17 +159,16 @@ def get_action_keyboard():
 
     builder.row(
         InlineKeyboardButton(text="🔍 Новый поиск", callback_data="new_search"),
-        InlineKeyboardButton(text="📄 Загрузить PDF", callback_data="upload_pdf")
+        InlineKeyboardButton(text="📄 Загрузить PDF", callback_data="upload_pdf"),
     )
 
-    builder.row(
-        InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu")
-    )
+    builder.row(InlineKeyboardButton(text="🏠 Главное меню", callback_data="main_menu"))
 
     return builder.as_markup()
 
 
 # ==================== ОБРАБОТЧИКИ КОМАНД ====================
+
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
@@ -188,10 +192,7 @@ async def cmd_start(message: Message):
         "👇 Выберите действие:"
     )
 
-    await message.answer(
-        welcome_text,
-        reply_markup=get_main_keyboard()
-    )
+    await message.answer(welcome_text, reply_markup=get_main_keyboard())
     logger.info(f"Пользователь {user_id} запустил бота")
 
 
@@ -200,7 +201,6 @@ async def cmd_help(message: Message):
     """Обработчик команды /help"""
     help_text = (
         "🛠 Помощь по использованию бота:\n\n"
-
         "🔍 Поиск информации:\n"
         "1. Нажмите '🔍 Поиск'\n"
         "2. Выберите область поиска:\n"
@@ -208,26 +208,20 @@ async def cmd_help(message: Message):
         "   • 📁 Мои - только ваши PDF\n"
         "   • 🌐 Habr - только статьи\n"
         "3. Введите запрос\n\n"
-
         "📄 Загрузка PDF:\n"
         "1. Нажмите '📄 Загрузить PDF'\n"
         "2. Отправьте PDF файл\n"
         "3. Документ добавится в поиск\n\n"
-
         "📊 Статистика:\n"
         "• Количество ваших документов\n"
         "• Всего статей в системе\n\n"
-
         "❓ Примеры запросов:\n"
         "• RAG архитектура\n"
         "• Python программирование\n"
         "• Машинное обучение\n"
     )
 
-    await message.answer(
-        help_text,
-        reply_markup=get_main_keyboard()
-    )
+    await message.answer(help_text, reply_markup=get_main_keyboard())
 
 
 @dp.message(Command("search"))
@@ -242,7 +236,7 @@ async def cmd_search(message: Message):
         "• 📁 Мои документы - только ваши PDF\n"
         "• 🌐 Только Habr - только статьи Habr\n\n"
         "Или просто введите запрос для поиска везде.",
-        reply_markup=get_search_keyboard()
+        reply_markup=get_search_keyboard(),
     )
 
 
@@ -261,16 +255,16 @@ async def cmd_docs(message: Message):
             "1. Нажмите '📄 Загрузить PDF'\n"
             "2. Отправьте PDF файл\n\n"
             "💡 После загрузки вы сможете искать по своим документам!",
-            reply_markup=get_search_keyboard()
+            reply_markup=get_search_keyboard(),
         )
         user_states[user_id] = {"mode": "search"}
     else:
         response = f"📚 Ваши документы ({len(user_docs)}):\n\n"
 
         for i, doc in enumerate(user_docs[:5], 1):
-            title = clean_text(doc.get('title', 'Без названия')[:40], keep_links=False)
-            chars = doc.get('text_length', 0)
-            date = doc.get('uploaded_at', '')[:10]
+            title = clean_text(doc.get("title", "Без названия")[:40], keep_links=False)
+            chars = doc.get("text_length", 0)
+            date = doc.get("uploaded_at", "")[:10]
 
             response += f"{i}. {title}\n"
             response += f"   📄 {chars:,} символов\n"
@@ -283,10 +277,7 @@ async def cmd_docs(message: Message):
 
         response += "💡 Используйте '📁 Мои документы' для поиска по ним."
 
-        await message.answer(
-            response,
-            reply_markup=get_search_keyboard()
-        )
+        await message.answer(response, reply_markup=get_search_keyboard())
         user_states[user_id] = {"mode": "docs"}
 
 
@@ -299,26 +290,21 @@ async def cmd_stats(message: Message):
 
     response = (
         "📊 Статистика системы:\n\n"
-
         "👤 Ваши данные:\n"
         f"• Документов: {stats['current_user_articles']}\n\n"
-
         "🌐 Общая база:\n"
         f"• Всего статей: {stats['total_articles']:,}\n"
         f"• Статей Habr: {stats['habr_articles']:,}\n"
         f"• Пользовательских: {stats['user_articles']:,}\n\n"
-
         "🔄 Обновлено:\n"
         f"{stats['last_update'][:19]}\n"
     )
 
-    await message.answer(
-        response,
-        reply_markup=get_main_keyboard()
-    )
+    await message.answer(response, reply_markup=get_main_keyboard())
 
 
 # ==================== ОБРАБОТЧИКИ КНОПОК ====================
+
 
 @dp.message(F.text == "🔍 Поиск")
 async def handle_search_button(message: Message):
@@ -333,9 +319,8 @@ async def handle_docs_button(message: Message):
 @dp.message(F.text == "⚙️ Настройки")
 async def handle_settings_button(message: Message):
     await message.answer(
-        "⚙️ Настройки поиска:\n\n"
-        "Используйте кнопки внизу для навигации.",
-        reply_markup=get_main_keyboard()
+        "⚙️ Настройки поиска:\n\n" "Используйте кнопки внизу для навигации.",
+        reply_markup=get_main_keyboard(),
     )
 
 
@@ -355,9 +340,7 @@ async def handle_main_menu_button(message: Message):
     user_states[user_id] = {"mode": "main"}
 
     await message.answer(
-        "🏠 Главное меню\n\n"
-        "Выберите действие:",
-        reply_markup=get_main_keyboard()
+        "🏠 Главное меню\n\n" "Выберите действие:", reply_markup=get_main_keyboard()
     )
 
 
@@ -371,10 +354,7 @@ async def handle_back_button(message: Message):
 @dp.message(F.text == "🔎 Везде")
 async def handle_search_everywhere(message: Message):
     user_id = str(message.from_user.id)
-    user_states[user_id] = {
-        "mode": "search_query",
-        "scope": SearchScope.ALL
-    }
+    user_states[user_id] = {"mode": "search_query", "scope": SearchScope.ALL}
 
     await message.answer(
         "🔎 Поиск везде\n\n"
@@ -383,7 +363,7 @@ async def handle_search_everywhere(message: Message):
         "• В статьях Habr\n"
         "• Во всей базе знаний\n\n"
         "📝 Введите ваш запрос:",
-        reply_markup=get_back_keyboard()
+        reply_markup=get_back_keyboard(),
     )
 
 
@@ -401,38 +381,32 @@ async def handle_search_user_only(message: Message):
             "1. Нажмите '📄 Загрузить PDF'\n"
             "2. Отправьте файл\n\n"
             "Или выберите другую область поиска.",
-            reply_markup=get_search_keyboard()
+            reply_markup=get_search_keyboard(),
         )
         user_states[user_id] = {"mode": "search"}
     else:
-        user_states[user_id] = {
-            "mode": "search_query",
-            "scope": SearchScope.USER_ONLY
-        }
+        user_states[user_id] = {"mode": "search_query", "scope": SearchScope.USER_ONLY}
 
         await message.answer(
             f"📁 Поиск в ваших документах\n\n"
             f"У вас {len(user_docs)} документов.\n"
             f"Я буду искать только в них.\n\n"
             f"📝 Введите ваш запрос:",
-            reply_markup=get_back_keyboard()
+            reply_markup=get_back_keyboard(),
         )
 
 
 @dp.message(F.text == "🌐 Только Habr")
 async def handle_search_habr_only(message: Message):
     user_id = str(message.from_user.id)
-    user_states[user_id] = {
-        "mode": "search_query",
-        "scope": SearchScope.HABR_ONLY
-    }
+    user_states[user_id] = {"mode": "search_query", "scope": SearchScope.HABR_ONLY}
 
     await message.answer(
         "🌐 Поиск в статьях Habr\n\n"
         "Я буду искать только в статьях с Habr.\n"
         f"Доступно статей: {len(rag_agent.habr_articles):,}\n\n"
         "📝 Введите ваш запрос:",
-        reply_markup=get_back_keyboard()
+        reply_markup=get_back_keyboard(),
     )
 
 
@@ -453,11 +427,12 @@ async def handle_upload_pdf(message: Message):
         "• Максимальный размер: 50MB\n"
         "• Только PDF формат\n\n"
         "📎 Отправьте PDF файл:",
-        reply_markup=get_back_keyboard()
+        reply_markup=get_back_keyboard(),
     )
 
 
 # ==================== ОБРАБОТЧИК ТЕКСТОВЫХ СООБЩЕНИЙ ====================
+
 
 @dp.message(F.text)
 async def handle_text_message(message: Message):
@@ -469,9 +444,18 @@ async def handle_text_message(message: Message):
         return
 
     # Игнорируем текст, который является кнопками
-    button_texts = ["🔍 Поиск", "📁 Мои документы", "⚙️ Настройки", "📊 Статистика",
-                    "❓ Помощь", "🏠 Главное меню", "⬅️ Назад", "🔎 Везде",
-                    "🌐 Только Habr", "📄 Загрузить PDF"]
+    button_texts = [
+        "🔍 Поиск",
+        "📁 Мои документы",
+        "⚙️ Настройки",
+        "📊 Статистика",
+        "❓ Помощь",
+        "🏠 Главное меню",
+        "⬅️ Назад",
+        "🔎 Везде",
+        "🌐 Только Habr",
+        "📄 Загрузить PDF",
+    ]
 
     if user_text in button_texts:
         return
@@ -499,21 +483,27 @@ async def handle_text_message(message: Message):
                 response += "\n\n📚 **Источники:**\n"
 
                 for i, source in enumerate(result["sources"][:3], 1):
-                    icon = "📁" if source.get('is_user_document') else "🌐"
-                    title = source['title'][:60] + "..." if len(source['title']) > 60 else source['title']
-                    url = source['url']
+                    icon = "📁" if source.get("is_user_document") else "🌐"
+                    title = (
+                        source["title"][:60] + "..."
+                        if len(source["title"]) > 60
+                        else source["title"]
+                    )
+                    url = source["url"]
 
-                    if url.startswith('file://'):
+                    if url.startswith("file://"):
                         # Для локальных файлов просто показываем название
                         response += f"{i}. {icon} **{clean_text(title, keep_links=False)}** (ваш документ)\n"
                     elif url == "#" or not url:
                         # Если нет реальной ссылки
-                        response += f"{i}. {icon} **{clean_text(title, keep_links=False)}**\n"
+                        response += (
+                            f"{i}. {icon} **{clean_text(title, keep_links=False)}**\n"
+                        )
                     else:
                         # Для веб-ссылок создаем Markdown ссылку
                         clean_title = clean_text(title, keep_links=False)
                         # Убедимся, что ссылка корректная для Markdown
-                        safe_url = url.replace(')', '%29').replace('(', '%28')
+                        safe_url = url.replace(")", "%29").replace("(", "%28")
                         response += f"{i}. {icon} [{clean_title}]({safe_url})\n"
 
             # Обновляем сообщение С ПОДДЕРЖКОЙ MARKDOWN
@@ -521,7 +511,7 @@ async def handle_text_message(message: Message):
                 response,
                 parse_mode="Markdown",
                 reply_markup=get_action_keyboard(),
-                disable_web_page_preview=False  # Разрешаем превью ссылок
+                disable_web_page_preview=False,  # Разрешаем превью ссылок
             )
 
             # Обновляем состояние
@@ -535,16 +525,13 @@ async def handle_text_message(message: Message):
                 f"Произошла ошибка: {error_msg}\n\n"
                 f"Попробуйте еще раз.",
                 parse_mode="Markdown",
-                reply_markup=get_action_keyboard()
+                reply_markup=get_action_keyboard(),
             )
 
     # Если пользователь в главном меню и пишет запрос - ПРЕДЛАГАЕМ ВЫБРАТЬ ОБЛАСТЬ
     elif mode == "main":
         # Сохраняем запрос
-        user_states[user_id] = {
-            "mode": "search",
-            "last_query": user_text
-        }
+        user_states[user_id] = {"mode": "search", "last_query": user_text}
 
         await message.answer(
             f"🔍 **Запрос:** {clean_text(user_text, keep_links=False)}\n\n"
@@ -554,7 +541,7 @@ async def handle_text_message(message: Message):
             "• 🌐 Только Habr - только статьи Habr\n\n"
             "Или введите новый запрос.",
             parse_mode="Markdown",
-            reply_markup=get_search_keyboard()
+            reply_markup=get_search_keyboard(),
         )
 
     # Если пользователь просто ввел запрос без выбора области - ИЩЕМ ВЕЗДЕ
@@ -571,24 +558,30 @@ async def handle_text_message(message: Message):
             if result["sources"]:
                 response += "\n\n📚 **Источники:**\n"
                 for i, source in enumerate(result["sources"][:3], 1):
-                    icon = "📁" if source.get('is_user_document') else "🌐"
-                    title = source['title'][:60] + "..." if len(source['title']) > 60 else source['title']
-                    url = source['url']
+                    icon = "📁" if source.get("is_user_document") else "🌐"
+                    title = (
+                        source["title"][:60] + "..."
+                        if len(source["title"]) > 60
+                        else source["title"]
+                    )
+                    url = source["url"]
 
-                    if url.startswith('file://'):
+                    if url.startswith("file://"):
                         response += f"{i}. {icon} **{clean_text(title, keep_links=False)}** (ваш документ)\n"
                     elif url == "#" or not url:
-                        response += f"{i}. {icon} **{clean_text(title, keep_links=False)}**\n"
+                        response += (
+                            f"{i}. {icon} **{clean_text(title, keep_links=False)}**\n"
+                        )
                     else:
                         clean_title = clean_text(title, keep_links=False)
-                        safe_url = url.replace(')', '%29').replace('(', '%28')
+                        safe_url = url.replace(")", "%29").replace("(", "%28")
                         response += f"{i}. {icon} [{clean_title}]({safe_url})\n"
 
             await searching_msg.edit_text(
                 response,
                 parse_mode="Markdown",
                 reply_markup=get_action_keyboard(),
-                disable_web_page_preview=False
+                disable_web_page_preview=False,
             )
 
             user_states[user_id] = {"mode": "search_results"}
@@ -599,25 +592,22 @@ async def handle_text_message(message: Message):
                 f"❌ **Ошибка при поиске**\n\n"
                 f"Произошла ошибка: {clean_text(str(e)[:100], keep_links=False)}",
                 parse_mode="Markdown",
-                reply_markup=get_action_keyboard()
+                reply_markup=get_action_keyboard(),
             )
 
 
 # ==================== ОБРАБОТЧИКИ CALLBACK-ЗАПРОСОВ ====================
+
 
 @dp.callback_query(F.data == "new_search")
 async def handle_new_search_callback(callback: CallbackQuery):
     user_id = str(callback.from_user.id)
     user_states[user_id] = {"mode": "search"}
 
-    await callback.message.edit_text(
-        "🔍 Начинаем новый поиск...",
-        reply_markup=None
-    )
+    await callback.message.edit_text("🔍 Начинаем новый поиск...", reply_markup=None)
 
     await callback.message.answer(
-        "Выберите область поиска:",
-        reply_markup=get_search_keyboard()
+        "Выберите область поиска:", reply_markup=get_search_keyboard()
     )
 
     await callback.answer()
@@ -628,14 +618,10 @@ async def handle_upload_pdf_callback(callback: CallbackQuery):
     user_id = str(callback.from_user.id)
     user_states[user_id] = {"mode": "upload_pdf"}
 
-    await callback.message.edit_text(
-        "📄 Загрузка PDF",
-        reply_markup=None
-    )
+    await callback.message.edit_text("📄 Загрузка PDF", reply_markup=None)
 
     await callback.message.answer(
-        "📎 Отправьте PDF файл:",
-        reply_markup=get_back_keyboard()
+        "📎 Отправьте PDF файл:", reply_markup=get_back_keyboard()
     )
 
     await callback.answer()
@@ -647,14 +633,11 @@ async def handle_main_menu_callback(callback: CallbackQuery):
     user_states[user_id] = {"mode": "main"}
 
     await callback.message.edit_text(
-        "🏠 Возвращаюсь в главное меню...",
-        reply_markup=None
+        "🏠 Возвращаюсь в главное меню...", reply_markup=None
     )
 
     await callback.message.answer(
-        "🏠 Главное меню\n\n"
-        "Выберите действие:",
-        reply_markup=get_main_keyboard()
+        "🏠 Главное меню\n\n" "Выберите действие:", reply_markup=get_main_keyboard()
     )
 
     await callback.answer()
@@ -662,26 +645,25 @@ async def handle_main_menu_callback(callback: CallbackQuery):
 
 # ==================== ОБРАБОТЧИК ДОКУМЕНТОВ ====================
 
+
 @dp.message(F.document)
 async def handle_document(message: Message):
     user_id = str(message.from_user.id)
     document = message.document
 
     # Проверяем, что это PDF
-    if not document.file_name or not document.file_name.lower().endswith('.pdf'):
+    if not document.file_name or not document.file_name.lower().endswith(".pdf"):
         await message.answer(
-            "❌ Неверный формат файла\n\n"
-            "Поддерживаются только PDF файлы.",
-            reply_markup=get_search_keyboard()
+            "❌ Неверный формат файла\n\n" "Поддерживаются только PDF файлы.",
+            reply_markup=get_search_keyboard(),
         )
         return
 
     # Проверяем размер
     if document.file_size > 50 * 1024 * 1024:
         await message.answer(
-            "❌ Файл слишком большой\n\n"
-            "Максимальный размер: 50MB",
-            reply_markup=get_search_keyboard()
+            "❌ Файл слишком большой\n\n" "Максимальный размер: 50MB",
+            reply_markup=get_search_keyboard(),
         )
         return
 
@@ -705,15 +687,20 @@ async def handle_document(message: Message):
                 page_text = page.extract_text() or ""
                 full_text += f"\n\n--- Страница {page_num} ---\n{page_text}"
 
-                pages_data.append({
-                    "page_number": page_num,
-                    "text": page_text,
-                    "char_count": len(page_text)
-                })
+                pages_data.append(
+                    {
+                        "page_number": page_num,
+                        "text": page_text,
+                        "char_count": len(page_text),
+                    }
+                )
 
             # Создаем статью
             article_data = {
-                "title": clean_text(document.file_name.replace(".pdf", "").replace("_", " ").title(), keep_links=False),
+                "title": clean_text(
+                    document.file_name.replace(".pdf", "").replace("_", " ").title(),
+                    keep_links=False,
+                ),
                 "author": "",
                 "date": datetime.now().isoformat(),
                 "text": full_text.strip(),
@@ -726,11 +713,11 @@ async def handle_document(message: Message):
                 "text_length": len(full_text.strip()),
                 "has_content": len(full_text.strip()) > 100,
                 "pages": pages_data,
-                "uploaded_by": user_id
+                "uploaded_by": user_id,
             }
 
         # Добавляем в RAG агент
-        if article_data['has_content']:
+        if article_data["has_content"]:
             article_id = rag_agent.add_user_article(article_data, user_id)
 
             if article_id:
@@ -745,13 +732,11 @@ async def handle_document(message: Message):
                 response = "❌ Ошибка при добавлении документа"
         else:
             response = (
-                "⚠️ В документе недостаточно текста\n\n"
-                "Попробуйте другой документ."
+                "⚠️ В документе недостаточно текста\n\n" "Попробуйте другой документ."
             )
 
         await processing_msg.edit_text(
-            clean_text(response, keep_links=False),
-            reply_markup=get_action_keyboard()
+            clean_text(response, keep_links=False), reply_markup=get_action_keyboard()
         )
 
         user_states[user_id] = {"mode": "search_results"}
@@ -761,11 +746,12 @@ async def handle_document(message: Message):
         await processing_msg.edit_text(
             f"❌ Ошибка обработки PDF\n\n"
             f"Произошла ошибка: {clean_text(str(e)[:150], keep_links=False)}",
-            reply_markup=get_action_keyboard()
+            reply_markup=get_action_keyboard(),
         )
 
 
 # ==================== ФУНКЦИЯ ЗАПУСКА ====================
+
 
 async def main():
     logger.info("Бот запускается...")
