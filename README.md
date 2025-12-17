@@ -77,6 +77,6 @@ python parser_articles/main.py --all
 ## 📞 Контакты
 
 Issues: [GitHub](https://github.com/bragind/article-agent/issues)  
-Telegram: @bragind
+Telegram: @DmitiyBragin
 
 *Проект использует Git LFS для хранения больших файлов*
