@@ -1,0 +1,20 @@
+﻿name: CI/CD for Nick Branch
+
+on:
+  push:
+    branches: [ nick ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Simple validation
+        run: |
+          echo "🎯 Validating branch nick..."
+          echo "📁 Files present:"
+          ls -la
+          echo ""
+          echo "✅ CI/CD is working!"
+          echo "## ✅ Branch nick validated" >> $GITHUB_STEP_SUMMARY

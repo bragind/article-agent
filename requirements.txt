@@ -1,17 +1,44 @@
-# Основные языковые модели и эмбеддинги для RAG
+# Core dependencies
+streamlit>=1.29.0
+pandas>=2.1.4
+plotly>=5.18.0
+numpy>=1.24.3
+
+# PDF processing
+pdfplumber>=0.10.3
+pymupdf>=1.23.8  # или закомментируйте если не нужно
+
+# Telegram bot
+aiogram>=3.0.0
+python-dotenv>=1.0.0
+
+# RAG and ML
 sentence-transformers>=2.2.2
-
-# Векторная база данных и её зависимости
 chromadb>=0.4.22
-pypika>=0.48.9
-posthog>=2.4.2
+scikit-learn>=1.3.2
 
-# Парсинг и обработка данных
-beautifulsoup4>=4.12.0
-lxml>=4.9.0
+# Web scraping
+beautifulsoup4>=4.12.2
+lxml>=4.9.3
 requests>=2.31.0
+
+# Utilities
+python-multipart>=0.0.6
+httpx>=0.25.1
+pydantic>=2.5.0
+loguru>=0.7.2
+
+# Основные зависимости
+python-dotenv>=1.0.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.0.0
+
+# Для RAG агента
+numpy>=1.24.0
 pandas>=2.0.0
 
+# Для линтинга
 # Дополнительные форматы для расширяемости
 PyPDF2>=3.0.0
 python-docx>=1.1.0
@@ -28,3 +55,4 @@ requests>=2.31.0
 pytest>=7.4.0
 flake8>=6.0.0
 black>=23.0.0
+mypy>=1.5.0
