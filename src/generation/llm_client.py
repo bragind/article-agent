@@ -227,6 +227,105 @@ class LLMClient:
         
         return questions[:num_questions]
     
+    
+    def generate_tags_for_document(self, text: str, title: str = "", max_tags: int = 5) -> List[str]:
+        """
+        Генерация тегов для документа с помощью LLM
+        
+        Args:
+            text: Текст документа (первые 2000 символов достаточно)
+            title: Заголовок документа
+            max_tags: Максимальное количество тегов
+            
+        Returns:
+            Список тегов
+        """
+        system_prompt = """Ты AI-ассистент для категоризации технических документов.
+        Твоя задача - проанализировать документ и выделить ключевые теги для поиска и категоризации.
+
+        **СТРОГИЕ ПРАВИЛА:**
+        1. Верни ТОЛЬКО теги через запятую, без пояснений
+        2. Не пиши вступлений, заключений, комментариев
+        3. Не используй фразы типа "ключевые теги:", "теги документа:"
+        4. Только список тегов через запятую
+
+        **Примеры правильного ответа:**
+        - машинное обучение, python, нейронные сети
+        - docker, контейнеризация, devops
+        - базы данных, sql, оптимизация запросов
+
+        **Примеры НЕПРАВИЛЬНОГО ответа:**
+        - "После анализа я выделил теги: машинное обучение" ❌
+        - "Ключевые теги документа: python, алгоритмы" ❌
+        - "Вот теги: docker, kubernetes" ❌"""
+
+        # Берем часть текста для анализа (первые 1500 символов)
+        preview = text[:1500]
+        
+        prompt = f"""Проанализируй документ и выдели {max_tags} ключевых тегов.
+
+    Заголовок документа: {title}
+
+    Содержимое документа (начало):
+    {preview}
+
+    **Инструкции:**
+    1. Проанализируй тему и содержание документа
+    2. Выдели ключевые технические концепции
+    3. Выбери наиболее релевантные термины
+    4. Верни только теги через запятую
+
+    Теги (через запятую):"""
+
+        try:
+            response = self.generate_response(prompt, system_prompt, temperature=0.3, max_tokens=200)
+            
+            # Обработка ответа
+            tags = []
+            if response:
+                # Разделяем по запятым, точкам с запятой или переносам строк
+                import re
+                raw_tags = re.split(r'[,;]|\n', response)
+                
+                for tag in raw_tags:
+                    tag_clean = tag.strip().lower()
+                    
+                    # Убираем номера, маркеры списка
+                    tag_clean = re.sub(r'^\d+[\.\)]\s*', '', tag_clean)
+                    tag_clean = re.sub(r'^[\-\*]\s*', '', tag_clean)
+                    
+                    # Проверяем длину и содержание
+                    if (tag_clean and 
+                        2 <= len(tag_clean) <= 50 and 
+                        not tag_clean.startswith('тег') and
+                        not tag_clean.startswith('пример')):
+                        tags.append(tag_clean)
+            
+            # Если LLM не вернул теги или их мало, добавляем fallback
+            if len(tags) < 2:
+                # Добавляем теги на основе заголовка
+                if title:
+                    title_words = title.lower().split()
+                    tech_words = [w for w in title_words if len(w) > 3][:2]
+                    tags.extend(tech_words)
+                
+                # Добавляем общие теги
+                fallback_tags = ["технический документ", "материал", "статья"]
+                tags.extend(fallback_tags)
+            
+            # Убираем дубликаты и ограничиваем количество
+            unique_tags = []
+            for tag in tags:
+                if tag not in unique_tags and len(unique_tags) < max_tags:
+                    unique_tags.append(tag)
+            
+            return unique_tags[:max_tags]
+            
+        except Exception as e:
+            logger.warning(f"Ошибка генерации тегов через LLM: {e}")
+            # Fallback теги
+            return ["технический документ", "материал", "статья"]
+    
     def test_connection(self) -> bool:
         """
         Проверка подключения к серверу Ollama

@@ -113,7 +113,7 @@ class TextChunker:
             
             # Пытаемся закончить на границе предложения
             if end < len(text):
-                # Ищем конец предложения ближе к концу чанка
+                # Ищем конец предложения ближе к концу чанк
                 for lookahead in range(100):
                     if end + lookahead >= len(text):
                         break

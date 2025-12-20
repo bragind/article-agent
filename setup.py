@@ -1,4 +1,3 @@
-# setup.py
 from setuptools import setup, find_packages
 
 setup(
@@ -15,6 +14,10 @@ setup(
         "sentence-transformers>=2.2.2",
         "beautifulsoup4>=4.12.2",
         "requests>=2.31.0",
+        "chromadb>=0.4.22",
+        "numpy>=1.24.3",
+        "pydantic>=2.5.0",
+        "loguru>=0.7.2",
     ],
     python_requires=">=3.8",
 )

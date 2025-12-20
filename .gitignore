@@ -36,6 +36,7 @@ logs/
 .coverage
 htmlcov/
 etm.py
+etm1.py
 *.md
 !README.md
 
