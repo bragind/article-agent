@@ -233,21 +233,29 @@ class RAGAgent:
                 # Используем UUID для уникальных ID
                 chunk_id = f"chunk_{uuid.uuid4().hex[:12]}_{article.get('id', '')[:8]}"
                 
-                # Обрабатываем теги: всегда сохраняем как список
-                def normalize_tags(tags):
-                    """Нормализует теги к строковому формату"""
-                    if isinstance(tags, list):
-                        return ", ".join([str(t).strip() for t in tags if t and str(t).strip()])[:200]
-                    elif isinstance(tags, str):
-                        # Очищаем строку: убираем лишние пробелы, дубли разделителей
-                        tags = tags.replace(";", ",").replace("|", ",")
-                        tags = re.sub(r',\s*,', ',', tags)
-                        tags = re.sub(r'\s+', ' ', tags)
-                        return tags.strip(" ,")[:200]
-                    else:
-                        return str(tags)[:200] if tags else ""
-
-                tags_str = normalize_tags(article.get("tags", []))
+                # КОНСИСТЕНТНОСТЬ: Всегда сохраняем теги как строку
+                tags = article.get("tags", [])
+                tags_str = ""
+                
+                if isinstance(tags, list):
+                    # Фильтруем пустые теги, убираем дубликаты
+                    unique_tags = []
+                    seen = set()
+                    for tag in tags:
+                        if tag and str(tag).strip():
+                            tag_str = str(tag).strip()
+                            if tag_str not in seen:
+                                seen.add(tag_str)
+                                unique_tags.append(tag_str)
+                    tags_str = ", ".join(unique_tags[:10])  # Ограничиваем 10 тегами
+                elif isinstance(tags, str):
+                    # Очищаем строку: удаляем лишние разделители
+                    tags = tags.replace(";", ",").replace("|", ",")
+                    tags = re.sub(r',\s*,', ',', tags)  # Убираем двойные запятые
+                    tags = re.sub(r'\s+', ' ', tags)    # Убираем лишние пробелы
+                    tags_str = tags.strip(" ,")[:200]   # Ограничиваем длину
+                elif tags:  # Любой другой тип
+                    tags_str = str(tags)[:200]
                 
                 # Определяем uploaded_by
                 uploaded_by = user_id if article.get("is_user_document") else "system"
@@ -256,17 +264,17 @@ class RAGAgent:
                 
                 metadata = {
                     "article_id": article.get("id", ""),
-                    "title": article.get("title", "Без названия"),
-                    "author": article.get("author", "Неизвестен"),
-                    "url": article.get("url", ""),
-                    "source": article.get("source", "Unknown"),
-                    "date": article.get("date", ""),
-                    "tags": tags_str,
+                    "title": article.get("title", "Без названия")[:200],
+                    "author": article.get("author", "Неизвестен")[:100],
+                    "url": article.get("url", "")[:200],
+                    "source": article.get("source", "Unknown")[:100],
+                    "date": str(article.get("date", ""))[:50],
+                    "tags": tags_str,  # Всегда строка!
                     "chunk_index": i,
                     "total_chunks": len(chunks),
                     "is_user_document": article.get("is_user_document", False),
                     "source_type": article.get("source_type", "unknown"),
-                    "uploaded_by": uploaded_by
+                    "uploaded_by": uploaded_by[:50]
                 }
                 chunk_objects.append({
                     "id": chunk_id,
@@ -326,18 +334,21 @@ class RAGAgent:
     
     def _vector_search(self, query: str, user_id: str, scope: SearchScope, limit: int) -> List[Dict]:
         """Векторный поиск с фильтрацией по области"""
+        # Проверяем, что векторный поиск доступен
+        if not self.use_vector_search or not self.vector_store or not self.embedder:
+            logger.warning("Векторный поиск недоступен, возвращаю пустой список")
+            return []
+        
         try:
-            if not self.embedder:
-                logger.error("Embedder не инициализирован для векторного поиска")
-                return []
+            # embed() возвращает numpy array формы (1, embedding_dim) даже для одного текста
+            query_embedding_result = self.embedder.embed([query])
             
-            # Генерируем эмбеддинг запроса
-            query_embedding = self.embedder.embed([query])
-            if len(query_embedding) == 0:
+            if query_embedding_result is None or len(query_embedding_result) == 0:
                 logger.error("Не удалось создать эмбеддинг для запроса")
                 return []
             
-            query_embedding = query_embedding[0]
+            # Берём первый (и единственный) эмбеддинг
+            query_embedding = query_embedding_result[0]  # Одномерный numpy array
             
             # Фильтрация по области поиска
             where_filter = None
@@ -353,6 +364,7 @@ class RAGAgent:
                 }
                 logger.debug(f"Поиск только в пользовательских документах, фильтр: {where_filter}")
             elif scope == SearchScope.ALL:
+                # ВАЖНО: Используем $or для поиска в обоих источниках
                 where_filter = {
                     "$or": [
                         {"source_type": {"$eq": "habr"}},
@@ -366,43 +378,58 @@ class RAGAgent:
                 }
                 logger.debug(f"Поиск везде, фильтр: {where_filter}")
             
-            # Выполняем поиск
-            try:
-                results = self.vector_store.search(
-                    query_embedding, 
-                    top_k=limit * 3,
-                    where=where_filter
-                )
-            except Exception as e:
-                logger.error(f"Ошибка при выполнении поиска в векторной БД: {e}")
+            # Выполняем поиск с увеличенным limit для лучшей фильтрации
+            search_limit = limit * 2
+            results = self.vector_store.search(
+                query_embedding, 
+                top_k=search_limit,
+                where=where_filter
+            )
+            
+            if not results or not results.get("documents"):
+                logger.info("Векторный поиск не дал результатов")
                 return []
             
-            if not results or not results.get("documents") or not results["documents"][0]:
-                logger.info("Векторный поиск не дал результатов")
+            # ChromaDB возвращает список списков: documents[0] - результаты для первого запроса
+            docs = results["documents"][0] if results["documents"] else []
+            metas = results["metadatas"][0] if results["metadatas"] else []
+            
+            if not docs or not metas:
                 return []
             
             # Форматируем результаты
             formatted_results = []
-            for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-                # Проверяем, что документ принадлежит пользователю
-                if scope == SearchScope.USER_ONLY and meta.get("uploaded_by") != user_id:
-                    continue
-                    
+            for i, (doc, meta) in enumerate(zip(docs, metas)):
+                # Дополнительная проверка для пользовательских документов
+                if scope == SearchScope.USER_ONLY:
+                    if meta.get("uploaded_by") != user_id:
+                        continue
+                
+                # Обрабатываем теги из строки обратно в список
+                tags_data = meta.get("tags", "")
+                if isinstance(tags_data, str):
+                    # Разделяем строку тегов по запятым, очищаем
+                    tags_list = [tag.strip() for tag in tags_data.split(',') if tag.strip()]
+                elif isinstance(tags_data, list):
+                    tags_list = tags_data
+                else:
+                    tags_list = []
+                
                 formatted_results.append({
                     "article": {
-                        "id": meta.get("article_id", ""),
+                        "id": meta.get("article_id", f"unknown_{i}"),
                         "title": meta.get("title", "Без названия"),
                         "text": doc,
                         "author": meta.get("author", "Неизвестен"),
                         "url": meta.get("url", ""),
                         "source": meta.get("source", "Unknown"),
                         "date": meta.get("date", ""),
-                        "tags": meta.get("tags", []),
+                        "tags": tags_list,  # Возвращаем как список
                         "text_length": len(doc),
                         "is_user_document": meta.get("is_user_document", False),
                         "uploaded_by": meta.get("uploaded_by", "")
                     },
-                    "score": 1.0,  # Векторный поиск возвращает схожесть
+                    "score": 1.0 - (i * 0.05),  # Имитация релевантности (первые результаты лучше)
                     "is_user_document": meta.get("is_user_document", False)
                 })
             
@@ -411,8 +438,10 @@ class RAGAgent:
             
         except Exception as e:
             logger.error(f"Ошибка векторного поиска: {e}")
-            raise  # Пробрасываем исключение для fallback
-    
+            import traceback
+            logger.error(traceback.format_exc())
+            return []  # Возвращаем пустой список вместо выброса исключения
+        
     def _text_search(self, query: str, user_id: str, scope: SearchScope, limit: int) -> List[Dict]:
         """Текстовый поиск (fallback)"""
         try:

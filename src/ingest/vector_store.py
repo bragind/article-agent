@@ -173,40 +173,45 @@ class VectorStore:
         logger.info(f"Успешно добавлено {added_count} чанков")
 
     def search(self, 
-           query_embedding: np.ndarray, 
-           top_k: int = 5, 
-           where: Optional[Dict] = None) -> Dict[str, List]:
+            query_embedding: np.ndarray, 
+            top_k: int = 5, 
+            where: Optional[Dict] = None) -> Dict[str, List]:
         """
         Поиск похожих чанков с поддержкой фильтрации
         
         Args:
-            query_embedding: Эмбеддинг запроса
+            query_embedding: Эмбеддинг запроса (одномерный массив)
             top_k: Количество возвращаемых результатов
             where: Условия фильтрации (например {"source_type": "habr"})
             
         Returns:
             Результаты поиска
         """
-        # Всегда преобразуем в список списков
+        # ВАЖНО: ChromaDB ожидает двумерный массив: [[эмбеддинг]]
+        # query_embedding - одномерный массив, нужно обернуть в список
+        
         query_embedding_list = query_embedding
         if hasattr(query_embedding, 'tolist'):
-            query_embedding_list = query_embedding.tolist()
+            query_embedding_list = query_embedding.tolist()  # [0.1, 0.2, ...]
+        
+        # ChromaDB ждёт список эмбеддингов: [[0.1, 0.2, ...]]
+        query_embeddings = [query_embedding_list]  # Двумерный список с одним элементом
         
         try:
             if where is None:
                 return self.collection.query(
-                    query_embeddings=[query_embedding_list],
+                    query_embeddings=query_embeddings,  # Исправлено: query_embeddings, а не query_embeddings=[query_embedding_list]
                     n_results=top_k
                 )
             else:
                 # Проверяем, что where не пустой
                 if where == {}:
                     return self.collection.query(
-                        query_embeddings=[query_embedding_list],
+                        query_embeddings=query_embeddings,
                         n_results=top_k
                     )
                 return self.collection.query(
-                    query_embeddings=[query_embedding_list],
+                    query_embeddings=query_embeddings,  # Исправлено
                     n_results=top_k,
                     where=where
                 )
@@ -215,7 +220,7 @@ class VectorStore:
             # Пробуем самый простой запрос без where
             try:
                 return self.collection.query(
-                    query_embeddings=[query_embedding_list],
+                    query_embeddings=query_embeddings,  # Исправлено
                     n_results=top_k
                 )
             except Exception as e2:
