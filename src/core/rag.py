@@ -348,18 +348,18 @@ class RAGAgent:
                 return []
             
             # Берём первый (и единственный) эмбеддинг
-            query_embedding = query_embedding_result[0]  # Одномерный numpy array
+            #query_embedding = query_embedding_result[0]  # Одномерный numpy array
             
             # Фильтрация по области поиска
             where_filter = None
             if scope == SearchScope.HABR_ONLY:
-                where_filter = {"source_type": "habr"}
+                where_filter = {"source_type": {"$eq": "habr"}}
                 logger.debug(f"Поиск только в Habr, фильтр: {where_filter}")
             elif scope == SearchScope.USER_ONLY:
                 where_filter = {
                     "$and": [
-                        {"source_type": "user"},
-                        {"uploaded_by": user_id}
+                        {"source_type": {"$eq": "user"}},
+                        {"uploaded_by": {"$eq": user_id}}
                     ]
                 }
                 logger.debug(f"Поиск только в пользовательских документах, фильтр: {where_filter}")
@@ -381,7 +381,7 @@ class RAGAgent:
             # Выполняем поиск с увеличенным limit для лучшей фильтрации
             search_limit = limit * 2
             results = self.vector_store.search(
-                query_embedding, 
+                query_embedding_result, 
                 top_k=search_limit,
                 where=where_filter
             )

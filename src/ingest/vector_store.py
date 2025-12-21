@@ -187,45 +187,47 @@ class VectorStore:
         Returns:
             Результаты поиска
         """
-        # ВАЖНО: ChromaDB ожидает двумерный массив: [[эмбеддинг]]
-        # query_embedding - одномерный массив, нужно обернуть в список
+        # Нормализуем размерность
+        if query_embedding.ndim == 1:
+            # Преобразуем одномерный массив в двумерный
+            query_embedding = query_embedding.reshape(1, -1)
+        elif query_embedding.ndim > 2:
+            raise ValueError(f"Неверная размерность эмбеддинга: {query_embedding.ndim}. Ожидается 1 или 2.")
         
-        query_embedding_list = query_embedding
+        # Преобразуем к списку для ChromaDB
         if hasattr(query_embedding, 'tolist'):
-            query_embedding_list = query_embedding.tolist()  # [0.1, 0.2, ...]
+            query_embeddings = query_embedding.tolist()
+        else:
+            query_embeddings = query_embedding
         
-        # ChromaDB ждёт список эмбеддингов: [[0.1, 0.2, ...]]
-        query_embeddings = [query_embedding_list]  # Двумерный список с одним элементом
+        # Проверяем, что это список списков
+        if not isinstance(query_embeddings, list) or not isinstance(query_embeddings[0], list):
+            query_embeddings = [query_embeddings] if isinstance(query_embeddings, list) else [[query_embeddings]]
         
+        # Выполняем запрос
         try:
-            if where is None:
+            if where is None or where == {}:
                 return self.collection.query(
-                    query_embeddings=query_embeddings,  # Исправлено: query_embeddings, а не query_embeddings=[query_embedding_list]
+                    query_embeddings=query_embeddings,
                     n_results=top_k
                 )
             else:
-                # Проверяем, что where не пустой
-                if where == {}:
-                    return self.collection.query(
-                        query_embeddings=query_embeddings,
-                        n_results=top_k
-                    )
                 return self.collection.query(
-                    query_embeddings=query_embeddings,  # Исправлено
+                    query_embeddings=query_embeddings,
                     n_results=top_k,
                     where=where
                 )
         except Exception as e:
             logger.error(f"Ошибка при поиске с where={where}: {e}")
-            # Пробуем самый простой запрос без where
+            # Fallback: пробуем без фильтра
             try:
                 return self.collection.query(
-                    query_embeddings=query_embeddings,  # Исправлено
+                    query_embeddings=query_embeddings,
                     n_results=top_k
                 )
             except Exception as e2:
                 logger.error(f"Критическая ошибка при поиске: {e2}")
-                return {"documents": [], "metadatas": [], "ids": []}
+                return {"documents": [[]], "metadatas": [[]], "ids": [[]]}
     
     def count(self) -> int:
         """Количество чанков в коллекции"""
