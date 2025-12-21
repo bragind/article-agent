@@ -1,0 +1,23 @@
+# Конфигурация авторизации
+auth:
+  enabled: true
+  session_timeout_minutes: 120
+  
+  # Пользователи (username: password_hash)
+  users:
+    admin: "$2b$12$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW"  # пароль: admin123
+    
+  # Роли и разрешения
+  roles:
+    admin:
+      - view
+      - search
+      - upload
+      - delete
+      - manage_users
+    user:
+      - view
+      - search
+      - upload
+    guest:
+      - view

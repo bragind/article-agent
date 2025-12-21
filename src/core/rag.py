@@ -7,6 +7,7 @@ import logging
 import json
 import os
 import hashlib
+import re
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 from enum import Enum
@@ -239,7 +240,6 @@ class RAGAgent:
                         return ", ".join([str(t).strip() for t in tags if t and str(t).strip()])[:200]
                     elif isinstance(tags, str):
                         # Очищаем строку: убираем лишние пробелы, дубли разделителей
-                        import re
                         tags = tags.replace(";", ",").replace("|", ",")
                         tags = re.sub(r',\s*,', ',', tags)
                         tags = re.sub(r'\s+', ' ', tags)

@@ -12,6 +12,20 @@ ingest:
 bot:
 	python src/bot.py
 
+auth-init:
+	python scripts/init_auth.py
+
+auth-reset:
+	rm -f config/auth_config.yaml data/users.json
+
+test-users:
+	python scripts/create_test_users.py
+
+reset-auth:
+	rm -f data/users.json
+	rm -f config/auth_config.yaml
+	@echo "Система аутентификации сброшена"
+
 streamlit:
 	streamlit run src/streamlit_app.py
 

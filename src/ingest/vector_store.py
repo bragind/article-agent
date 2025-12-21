@@ -193,7 +193,6 @@ class VectorStore:
             query_embedding_list = query_embedding.tolist()
         
         try:
-            # Не передаем where вообще, если он None
             if where is None:
                 return self.collection.query(
                     query_embeddings=[query_embedding_list],
