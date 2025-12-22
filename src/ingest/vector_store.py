@@ -4,6 +4,7 @@ from chromadb.config import Settings
 from typing import List, Dict, Any, Optional
 import numpy as np
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -232,3 +233,172 @@ class VectorStore:
     def count(self) -> int:
         """Количество чанков в коллекции"""
         return self.collection.count()
+
+    def search_with_filters(self, 
+                        query_embedding: np.ndarray, 
+                        top_k: int = 5, 
+                        tags: Optional[List[str]] = None,
+                        author: Optional[str] = None,
+                        date_from: Optional[str] = None,
+                        date_to: Optional[str] = None,
+                        where: Optional[Dict] = None) -> Dict[str, List]:
+        """
+        Поиск с фильтрами по тегам, автору и дате
+        
+        Args:
+            query_embedding: Эмбеддинг запроса
+            top_k: Количество результатов
+            tags: Список тегов
+            author: Автор (частичное совпадение)
+            date_from: Дата от
+            date_to: Дата до
+            where: Дополнительные условия ChromaDB
+            
+        Returns:
+            Результаты поиска
+        """
+        # Нормализуем размерность
+        if query_embedding.ndim == 1:
+            query_embedding = query_embedding.reshape(1, -1)
+        
+        # Преобразуем к списку
+        if hasattr(query_embedding, 'tolist'):
+            query_embeddings = query_embedding.tolist()
+        else:
+            query_embeddings = query_embedding
+        
+        # Строим фильтр для ChromaDB
+        chroma_filter = where or {}
+        
+        # Добавляем фильтр по автору
+        if author:
+            if not chroma_filter:
+                chroma_filter = {"author": {"$contains": author}}
+            else:
+                # Добавляем к существующему фильтру
+                if "$and" in chroma_filter:
+                    chroma_filter["$and"].append({"author": {"$contains": author}})
+                else:
+                    chroma_filter = {"$and": [chroma_filter, {"author": {"$contains": author}}]}
+        
+        # Для тегов используем $contains для каждого тега (ИЛИ логика)
+        if tags:
+            tag_conditions = []
+            for tag in tags:
+                tag_conditions.append({"tags": {"$contains": tag}})
+            
+            if len(tag_conditions) == 1:
+                tag_filter = tag_conditions[0]
+            else:
+                tag_filter = {"$or": tag_conditions}
+            
+            if not chroma_filter:
+                chroma_filter = tag_filter
+            else:
+                if "$and" in chroma_filter:
+                    chroma_filter["$and"].append(tag_filter)
+                else:
+                    chroma_filter = {"$and": [chroma_filter, tag_filter]}
+        
+        # Фильтр по дате (более сложный, т.к. дата в строке)
+        # Будем фильтровать на стороне Python после получения результатов
+        
+        try:
+            # Ищем с фильтрами (кроме даты)
+            if chroma_filter:
+                results = self.collection.query(
+                    query_embeddings=query_embeddings,
+                    n_results=top_k * 3,  # Берем больше для последующей фильтрации по дате
+                    where=chroma_filter
+                )
+            else:
+                results = self.collection.query(
+                    query_embeddings=query_embeddings,
+                    n_results=top_k * 3
+                )
+            
+            # Дополнительная фильтрация по дате на стороне Python
+            if date_from or date_to:
+                filtered_docs = []
+                filtered_metas = []
+                filtered_ids = []
+                
+                docs = results["documents"][0] if results["documents"] else []
+                metas = results["metadatas"][0] if results["metadatas"] else []
+                ids = results["ids"][0] if results["ids"] else []
+                
+                for doc, meta, doc_id in zip(docs, metas, ids):
+                    try:
+                        article_date = meta.get("date", "")
+                        if not article_date:
+                            # Если даты нет, включаем результат
+                            filtered_docs.append(doc)
+                            filtered_metas.append(meta)
+                            filtered_ids.append(doc_id)
+                            continue
+                        
+                        # Парсим дату из метаданных
+                        # Пробуем разные форматы
+                        date_obj = None
+                        for fmt in ["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"]:
+                            try:
+                                date_obj = datetime.strptime(article_date[:19], fmt)
+                                break
+                            except:
+                                continue
+                        
+                        if not date_obj:
+                            # Не смогли распарсить, включаем результат
+                            filtered_docs.append(doc)
+                            filtered_metas.append(meta)
+                            filtered_ids.append(doc_id)
+                            continue
+                        
+                        # Применяем фильтры по дате
+                        include = True
+                        if date_from:
+                            filter_from = datetime.strptime(date_from, "%Y-%m-%d")
+                            if date_obj.date() < filter_from.date():
+                                include = False
+                        
+                        if date_to:
+                            filter_to = datetime.strptime(date_to, "%Y-%m-%d")
+                            if date_obj.date() > filter_to.date():
+                                include = False
+                        
+                        if include:
+                            filtered_docs.append(doc)
+                            filtered_metas.append(meta)
+                            filtered_ids.append(doc_id)
+                            
+                    except Exception as e:
+                        logger.warning(f"Ошибка фильтрации по дате: {e}")
+                        # Включаем результат при ошибке
+                        filtered_docs.append(doc)
+                        filtered_metas.append(meta)
+                        filtered_ids.append(doc_id)
+                
+                # Обрезаем до top_k
+                results = {
+                    "documents": [filtered_docs[:top_k]],
+                    "metadatas": [filtered_metas[:top_k]],
+                    "ids": [filtered_ids[:top_k]]
+                }
+            else:
+                # Просто обрезаем до top_k
+                if results.get("documents"):
+                    results["documents"][0] = results["documents"][0][:top_k]
+                if results.get("metadatas"):
+                    results["metadatas"][0] = results["metadatas"][0][:top_k]
+                if results.get("ids"):
+                    results["ids"][0] = results["ids"][0][:top_k]
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Ошибка поиска с фильтрами: {e}")
+            # Fallback на поиск без фильтров
+            return self.collection.query(
+                query_embeddings=query_embeddings,
+                n_results=top_k
+            )

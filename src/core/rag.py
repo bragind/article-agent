@@ -1,5 +1,5 @@
 """
-src/core/rag.py - Основной RAG агент с поддержкой пользовательских документов и областей поиска
+src/core/rag.py - Основной RAG агент с поддержкой пользовательских документов, областей поиска и рекомендаций
 """
 
 import uuid
@@ -19,6 +19,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Настройка логирования
+logger = logging.getLogger(__name__)
+
 try:
     from src.ingest.embedder import Embedder
     from src.ingest.vector_store import VectorStore
@@ -35,8 +38,6 @@ except ImportError as e:
     HAS_LLM = False
     logging.warning(f"LLMClient не найден: {e}")
 
-logger = logging.getLogger(__name__)
-
 
 class SearchScope(Enum):
     """Области поиска"""
@@ -46,7 +47,7 @@ class SearchScope(Enum):
 
 
 class RAGAgent:
-    """Основной RAG агент с поддержкой пользовательских документов и векторного поиска"""
+    """Основной RAG агент с поддержкой пользовательских документов, векторного поиска и рекомендаций"""
     
     def __init__(self, 
                  data_dir: str = "data",
@@ -94,6 +95,9 @@ class RAGAgent:
         self.all_articles = []
         self._load_articles()
         
+        # Проверка качества данных (для отладки)
+        self._check_data_quality()
+        
         # Статистика
         self.total_chunks = 0
         self.initialization_errors = []
@@ -135,6 +139,55 @@ class RAGAgent:
                 self.initialization_errors.append(f"LLM init: {str(e)}")
                 self.llm_enabled = False
     
+    def _check_data_quality(self):
+        """Проверка качества данных для отладки"""
+        print("\n" + "="*50)
+        print("ПРОВЕРКА КАЧЕСТВА ДАННЫХ")
+        print("="*50)
+        
+        # Проверяем первые 5 статей Habr
+        print("\n📊 Первые 5 статей Habr:")
+        for i, article in enumerate(self.habr_articles[:5]):
+            print(f"\n{i+1}. {article.get('title', 'Без названия')[:50]}...")
+            print(f"   Автор: '{article.get('author', 'НЕТ')}'")
+            print(f"   Теги: {article.get('tags', [])}")
+            print(f"   Тип тегов: {type(article.get('tags'))}")
+        
+        # Проверяем общую статистику
+        print(f"\n📈 Общая статистика:")
+        print(f"   Всего статей: {len(self.all_articles)}")
+        print(f"   Статей Habr: {len(self.habr_articles)}")
+        print(f"   Пользовательских: {len(self.user_articles)}")
+        
+        # Проверяем авторов
+        authors_set = set()
+        for article in self.all_articles:
+            author = article.get('author', '')
+            if author and str(author).strip():
+                authors_set.add(str(author).strip())
+        
+        print(f"\n👥 Авторы:")
+        print(f"   Уникальных авторов: {len(authors_set)}")
+        if authors_set:
+            print(f"   Примеры авторов: {list(authors_set)[:5]}")
+        
+        # Проверяем теги
+        tags_set = set()
+        for article in self.all_articles:
+            tags = article.get('tags', [])
+            if isinstance(tags, list):
+                for tag in tags:
+                    if tag and str(tag).strip():
+                        tags_set.add(str(tag).strip())
+            elif isinstance(tags, str):
+                if tags.strip():
+                    tags_set.add(tags.strip())
+        
+        print(f"\n🏷️ Теги:")
+        print(f"   Уникальных тегов: {len(tags_set)}")
+        if tags_set:
+            print(f"   Примеры тегов: {list(tags_set)[:10]}")
+    
     def _check_readiness(self):
         """Проверка готовности системы"""
         if not self.all_articles:
@@ -146,15 +199,16 @@ class RAGAgent:
         if self.llm_enabled and not self.llm_client:
             self.initialization_errors.append("LLM клиент не инициализирован")
     
-    def _load_articles(self):
+    def _load_articles(self, max_articles: int = 2000):
         """Загрузка статей из всех источников"""
         try:
             # Загрузка статей Habr
             habr_path = self.data_dir / "articles_batch.jsonl"
             if habr_path.exists():
                 count = 0
+                import itertools
                 with open(habr_path, 'r', encoding='utf-8') as f:
-                    for line in f:
+                    for line in itertools.islice(f, max_articles):
                         if line.strip():
                             try:
                                 article = json.loads(line)
@@ -340,15 +394,15 @@ class RAGAgent:
             return []
         
         try:
-            # embed() возвращает numpy array формы (1, embedding_dim) даже для одного текста
+            # Генерируем эмбеддинг запроса
             query_embedding_result = self.embedder.embed([query])
             
             if query_embedding_result is None or len(query_embedding_result) == 0:
                 logger.error("Не удалось создать эмбеддинг для запроса")
                 return []
             
-            # Берём первый (и единственный) эмбеддинг
-            #query_embedding = query_embedding_result[0]  # Одномерный numpy array
+            # Извлекаем одномерный массив эмбеддинга
+            query_embedding = query_embedding_result[0]  # Одномерный numpy array
             
             # Фильтрация по области поиска
             where_filter = None
@@ -381,7 +435,7 @@ class RAGAgent:
             # Выполняем поиск с увеличенным limit для лучшей фильтрации
             search_limit = limit * 2
             results = self.vector_store.search(
-                query_embedding_result, 
+                query_embedding, 
                 top_k=search_limit,
                 where=where_filter
             )
@@ -505,39 +559,26 @@ class RAGAgent:
             return []
     
     def generate_answer(self, 
-                        query: str, 
-                        user_id: str, 
-                        scope: SearchScope = SearchScope.ALL) -> Dict:
+                                query: str, 
+                                user_id: str, 
+                                scope: SearchScope = SearchScope.ALL,
+                                tags: Optional[List[str]] = None,
+                                author: Optional[str] = None,
+                                date_from: Optional[str] = None,
+                                date_to: Optional[str] = None) -> Dict:
         """
-        Генерация ответа на основе найденных статей
-        
-        Args:
-            query: Вопрос пользователя
-            user_id: ID пользователя
-            scope: Область поиска
-            
-        Returns:
-            Словарь с ответом, источниками и вопросами
+        Генерация ответа с применением фильтров
         """
-        # Проверяем, есть ли статьи
-        if not self.all_articles:
-            return {
-                "answer": "В системе пока нет статей для поиска.\n\n"
-                          "Загрузите статьи или проверьте настройки данных.",
-                "sources": [],
-                "questions": []
-            }
+        # Поиск с фильтрами
+        search_results = self.search_with_filters(
+            query, user_id, scope, limit=5,
+            tags=tags, author=author, date_from=date_from, date_to=date_to
+        )
         
-        # Поиск релевантных статей
-        search_results = self.search(query, user_id, scope, limit=5)
-        
+        # Остальной код такой же как в generate_answer
         if not search_results:
             return {
-                "answer": f"По вашему запросу '{query}' ничего не найдено.\n\n"
-                         f"Попробуйте:\n"
-                         f"- Изменить формулировку запроса\n"
-                         f"- Использовать ключевые слова\n"
-                         f"- Изменить область поиска",
+                "answer": f"По вашему запросу '{query}' с указанными фильтрами ничего не найдено.",
                 "sources": [],
                 "questions": []
             }
@@ -545,10 +586,9 @@ class RAGAgent:
         # Используем LLM для генерации ответа
         if self.llm_enabled and self.llm_client:
             return self._generate_with_llm(query, search_results)
-        # Простой ответ без LLM
         else:
             return self._generate_simple_answer(query, search_results)
-    
+        
     def _generate_with_llm(self, query: str, search_results: List[Dict]) -> Dict:
         """Генерация ответа с использованием LLM"""
         try:
@@ -686,8 +726,8 @@ class RAGAgent:
             text = article_data.get("text", "")
             title = article_data.get("title", "")
 
-            # Используем LLM для генерации тегов (можно вынести в конфиг)
-            use_llm_for_tags = True  # Можно сделать настройкой
+            # Используем LLM для генерации теги
+            use_llm_for_tags = True
             tags = self.generate_document_tags(text, title, use_llm=use_llm_for_tags)
             
             # Убедимся что теги - список
@@ -872,7 +912,7 @@ class RAGAgent:
         try:
             # Пробуем LLM если доступен и разрешено
             if use_llm and self.llm_enabled and self.llm_client and text:
-                logger.info(f"Генерация тегов через LLM для документа: {title[:50]}...")
+                logger.info(f"Генерация теги через LLM для документа: {title[:50]}...")
                 
                 # Вызываем LLMClient
                 tags = self.llm_client.generate_tags_for_document(
@@ -882,22 +922,22 @@ class RAGAgent:
                 )
                 
                 if tags and len(tags) >= 2:
-                    logger.info(f"Сгенерировано тегов через LLM: {tags}")
+                    logger.info(f"Сгенерировано теги через LLM: {tags}")
                     return tags
             
             # Fallback: простой метод извлечения ключевых слов
-            logger.info(f"Использую простой метод генерации тегов для: {title[:50]}...")
+            logger.info(f"Использую простой метод генерации теги для: {title[:50]}...")
             simple_tags = self._extract_tags_simple(text, title)
             
             return simple_tags[:5]
             
         except Exception as e:
-            logger.error(f"Ошибка генерации тегов: {e}")
+            logger.error(f"Ошибка генерации теги: {e}")
             return ["документ", "загружено"]
 
     def _extract_tags_simple(self, text: str, title: str = "") -> List[str]:
         """
-        Простой метод извлечения тегов без LLM
+        Простой метод извлечения теги без LLM
         """
         try:
             import re
@@ -981,7 +1021,547 @@ class RAGAgent:
             return unique_tags[:5]
             
         except Exception as e:
-            logger.warning(f"Ошибка в простом методе извлечения тегов: {e}")
+            logger.warning(f"Ошибка в простом методе извлечения теги: {e}")
             return ["технический", "документ"]
+        
+    def search_with_filters(self, 
+                        query: str, 
+                        user_id: str, 
+                        scope: SearchScope = SearchScope.ALL, 
+                        limit: int = 10,
+                        tags: Optional[List[str]] = None,
+                        author: Optional[str] = None,
+                        date_from: Optional[str] = None,
+                        date_to: Optional[str] = None) -> List[Dict]:
+        """
+        Поиск с фильтрами по тегам, автору и дате
+        """
+        logger.info("=== ПОИСК С ФИЛЬТРАМИ ===")
+        logger.info(f"Запрос: {query}")
+        logger.info(f"User ID: {user_id}")
+        logger.info(f"Scope: {scope}")
+        logger.info(f"Теги: {tags}")
+        logger.info(f"Автор: {author}")
+        logger.info(f"Дата от: {date_from}")
+        logger.info(f"Дата до: {date_to}")
+        
+        # Сначала обычный поиск
+        logger.info("Выполняю обычный поиск...")
+        search_results = self.search(query, user_id, scope, limit * 10)  # Увеличиваем в 10 раз для фильтрации
+        logger.info(f"Найдено результатов до фильтрации: {len(search_results)}")
+        
+        if not search_results:
+            logger.info("Нет результатов для фильтрации")
+            return []
+        
+        # Применяем фильтры
+        filtered_results = []
+        
+        for result in search_results:
+            article = result["article"]
+            include = True
+            
+            # Фильтр по тегам
+            if tags and tags != [] and tags != [""]:
+                article_tags = article.get("tags", [])
+                
+                # Нормализуем теги статьи
+                if isinstance(article_tags, str):
+                    article_tags = [t.strip().lower() for t in article_tags.split(',') if t.strip()]
+                elif isinstance(article_tags, list):
+                    article_tags = [str(t).strip().lower() for t in article_tags if t]
+                else:
+                    article_tags = []
+                
+                # Нормализуем запрошенные теги
+                norm_tags = [t.strip().lower() for t in tags if t and str(t).strip()]
+                
+                # Проверяем, есть ли хотя бы один из запрошенных тегов
+                if norm_tags and not any(tag in article_tags for tag in norm_tags):
+                    include = False
+                    logger.debug(f"Статья '{article.get('title')}' исключена по тегам")
+            
+            # Фильтр по автору
+            if author and author.strip():
+                article_author = str(article.get("author", "")).lower()
+                if author.lower() not in article_author:
+                    include = False
+                    logger.debug(f"Статья '{article.get('title')}' исключена по автору")
+            
+            # Фильтр по дате
+            article_date = article.get("date", "")
+            if article_date and (date_from or date_to):
+                try:
+                    date_str = str(article_date)
+                    date_obj = None
+                    
+                    # Пробуем разные форматы
+                    for fmt in ["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"]:
+                        try:
+                            date_obj = datetime.strptime(date_str[:10], "%Y-%m-%d")
+                            break
+                        except:
+                            continue
+                    
+                    if date_obj:
+                        if date_from:
+                            try:
+                                filter_from = datetime.strptime(date_from, "%Y-%m-%d")
+                                if date_obj.date() < filter_from.date():
+                                    include = False
+                                    logger.debug(f"Статья '{article.get('title')}' исключена по дате (слишком старая)")
+                            except:
+                                pass
+                        
+                        if date_to:
+                            try:
+                                filter_to = datetime.strptime(date_to, "%Y-%m-%d")
+                                if date_obj.date() > filter_to.date():
+                                    include = False
+                                    logger.debug(f"Статья '{article.get('title')}' исключена по дате (слишком новая)")
+                            except:
+                                pass
+                                
+                except Exception as e:
+                    logger.warning(f"Ошибка фильтрации даты {article_date}: {e}")
+            
+            if include:
+                filtered_results.append(result)
+                
+                if len(filtered_results) >= limit:
+                    break
+        
+        logger.info(f"После фильтров: {len(filtered_results)} из {len(search_results)} результатов")
+        
+        # Вывести информацию о первых 3 результатах
+        for i, result in enumerate(filtered_results[:3]):
+            article = result["article"]
+            logger.info(f"Результат {i+1}: {article.get('title')}")
+            logger.info(f"  Автор: {article.get('author')}")
+            logger.info(f"  Теги: {article.get('tags')}")
+            logger.info(f"  Дата: {article.get('date')}")
+        
+        return filtered_results[:limit]
+
+    def get_all_tags(self, user_id: str = None) -> List[str]:
+        """
+        Получение всех уникальных тегов из статей
+        
+        Args:
+            user_id: Если указан, возвращает теги только для пользователя
+            
+        Returns:
+            Список уникальных тегов
+        """
+        all_tags = set()
+        
+        # Используем все статьи для глобальных тегов
+        articles_to_check = self.all_articles
+        
+        for article in articles_to_check:
+            # Пропускаем статьи другого пользователя, если user_id указан
+            if user_id and article.get("is_user_document"):
+                if article.get("uploaded_by") != user_id:
+                    continue
+            
+            tags = article.get("tags", [])
+            
+            # ВАЖНО: В статьях Habr теги хранятся как список строк
+            # В пользовательских документах могут быть как список, так и строка
+            
+            if isinstance(tags, str):
+                # Разделяем строку тегов
+                tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+                for tag in tag_list:
+                    if tag and len(tag) < 50 and tag.lower() not in ['', 'none', 'nan']:
+                        all_tags.add(tag)
+            elif isinstance(tags, list):
+                for tag in tags:
+                    tag_str = str(tag).strip()
+                    if tag_str and len(tag_str) < 50 and tag_str.lower() not in ['', 'none', 'nan']:
+                        all_tags.add(tag_str)
+            elif tags:  # Любой другой тип
+                tag_str = str(tags).strip()[:50]
+                if tag_str:
+                    all_tags.add(tag_str)
+        
+        # Сортируем и возвращаем
+        return sorted(list(all_tags))
+
+    def get_all_authors(self, user_id: str = None) -> List[str]:
+        """
+        Получение всех уникальных авторов
+        
+        Args:
+            user_id: Если указан, возвращает авторов только для пользователя
+            
+        Returns:
+            Список уникальных авторов
+        """
+        authors = set()
+        
+        # Используем все статьи для глобальных авторов
+        articles_to_check = self.all_articles
+        
+        for article in articles_to_check:
+            # Пропускаем статьи другого пользователя, если user_id указан
+            if user_id and article.get("is_user_document"):
+                if article.get("uploaded_by") != user_id:
+                    continue
+            
+            author = article.get("author", "")
+            
+            if author:
+                # Очищаем авторское имя
+                author_clean = str(author).strip()
+                
+                # Убираем пустые значения и дефолтные
+                if author_clean and len(author_clean) > 1:
+                    # Убираем префиксы типа @
+                    if author_clean.startswith('@'):
+                        author_clean = author_clean[1:].strip()
+                    
+                    # Убираем "неизвестен", "unknown" и т.д.
+                    lower_author = author_clean.lower()
+                    if lower_author not in ['', 'неизвестен', 'неизвестный', 'unknown', 'n/a', 'none', 'автор не указан']:
+                        authors.add(author_clean)
+        
+        # Сортируем и возвращаем
+        return sorted(list(authors))
     
+    # ==================== МЕТОДЫ ДЛЯ РЕКОМЕНДАЦИЙ ====================
+    
+    def get_similar_articles(self, 
+                            article_id: str, 
+                            user_id: str = None, 
+                            limit: int = 5,
+                            similarity_threshold: float = 0.6) -> List[Dict]:
+        """
+        Получение похожих статей на основе контента и метаданных
+        
+        Args:
+            article_id: ID целевой статьи
+            user_id: ID пользователя (для фильтрации)
+            limit: Количество рекомендаций
+            similarity_threshold: Порог схожести (0-1)
+            
+        Returns:
+            Список похожих статей с оценкой схожести
+        """
+        try:
+            logger.info(f"Поиск похожих статей для {article_id}, пользователь: {user_id}")
+            
+            # Находим целевую статью
+            target_article = None
+            for article in self.all_articles:
+                if article.get("id") == article_id:
+                    target_article = article
+                    break
+            
+            if not target_article:
+                logger.warning(f"Статья {article_id} не найдена")
+                return []
+            
+            # Если векторный поиск недоступен, используем метаданные
+            if not self.use_vector_search or not self.vector_store or not self.embedder:
+                logger.info("Векторный поиск недоступен, использую поиск по метаданным")
+                return self._get_similar_by_metadata(target_article, user_id, limit)
+            
+            # Подготавливаем текст для эмбеддинга
+            target_text = self._prepare_text_for_embedding(target_article)
+            logger.debug(f"Подготовленный текст для эмбеддинга: {len(target_text)} символов")
+            
+            # Генерируем эмбеддинг
+            try:
+                # embed() возвращает numpy array с формой (1, embedding_dim) для одного текста
+                query_embedding_result = self.embedder.embed([target_text])
+                
+                if query_embedding_result is None or len(query_embedding_result) == 0:
+                    logger.error("Не удалось создать эмбеддинг для статьи")
+                    return self._get_similar_by_metadata(target_article, user_id, limit)
+                
+                # Извлекаем эмбеддинг - это одномерный массив
+                query_embedding = query_embedding_result[0]  # Это одномерный numpy array
+                
+                logger.debug(f"Размер эмбеддинга: {query_embedding.shape}")
+                
+            except Exception as e:
+                logger.error(f"Ошибка создания эмбеддинга: {e}")
+                return self._get_similar_by_metadata(target_article, user_id, limit)
+            
+            # Выполняем поиск похожих статей
+            try:
+                # Ищем больше результатов, чтобы отфильтровать
+                search_results = self.vector_store.search(
+                    query_embedding, 
+                    top_k=limit * 3  # Ищем больше для фильтрации
+                )
+                
+                if not search_results or not search_results.get("documents"):
+                    logger.info("Векторный поиск не дал результатов")
+                    return self._get_similar_by_metadata(target_article, user_id, limit)
+                
+                # Обрабатываем результаты
+                similar_articles = []
+                
+                # ChromaDB возвращает списки в списке: documents[0] - результаты для первого запроса
+                docs = search_results["documents"][0] if search_results.get("documents") else []
+                metas = search_results["metadatas"][0] if search_results.get("metadatas") else []
+                distances = search_results.get("distances", [[]])[0] if search_results.get("distances") else []
+                
+                logger.debug(f"Найдено {len(docs)} потенциально похожих чанков")
+                
+                seen_articles = set()  # Для отслеживания уже добавленных статей
+                
+                for i, (doc, meta) in enumerate(zip(docs, metas)):
+                    # Пропускаем чанки из той же статьи
+                    if meta.get("article_id") == article_id:
+                        continue
+                    
+                    article_id_from_meta = meta.get("article_id")
+                    if not article_id_from_meta:
+                        continue
+                    
+                    # Проверяем схожесть (если есть расстояния)
+                    if distances and i < len(distances):
+                        similarity = 1 - distances[i]  # Преобразуем расстояние в схожесть
+                        if similarity < similarity_threshold:
+                            continue
+                    else:
+                        similarity = 0.7  # Значение по умолчанию
+                    
+                    # Проверяем доступность для пользователя
+                    if user_id and meta.get("source_type") == "user":
+                        if meta.get("uploaded_by") != user_id:
+                            continue
+                    
+                    # Добавляем статью, если еще не добавляли
+                    if article_id_from_meta not in seen_articles:
+                        # Ищем статью в памяти
+                        similar_article = self._get_article_by_id(article_id_from_meta)
+                        if similar_article:
+                            seen_articles.add(article_id_from_meta)
+                            
+                            # Вычисляем причину схожести
+                            reason = self._get_similarity_reason(target_article, similar_article)
+                            
+                            similar_articles.append({
+                                "article": similar_article,
+                                "similarity_score": similarity,
+                                "reason": reason,
+                                "source": "vector_search"
+                            })
+                            
+                            if len(similar_articles) >= limit:
+                                break
+                
+                # Если векторный поиск дал мало результатов, дополняем метаданными
+                if len(similar_articles) < limit:
+                    logger.info(f"Векторный поиск дал {len(similar_articles)} результатов, дополняю метаданными")
+                    metadata_results = self._get_similar_by_metadata(target_article, user_id, limit - len(similar_articles))
+                    
+                    # Добавляем только уникальные статьи
+                    for meta_result in metadata_results:
+                        meta_article_id = meta_result["article"].get("id")
+                        if meta_article_id not in seen_articles and meta_article_id != article_id:
+                            similar_articles.append(meta_result)
+                            seen_articles.add(meta_article_id)
+                            
+                            if len(similar_articles) >= limit:
+                                break
+                
+                # Сортируем по схожести
+                similar_articles.sort(key=lambda x: x["similarity_score"], reverse=True)
+                
+                logger.info(f"Найдено {len(similar_articles)} похожих статей для {article_id}")
+                return similar_articles[:limit]
+                
+            except Exception as e:
+                logger.error(f"Ошибка векторного поиска похожих статей: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                return self._get_similar_by_metadata(target_article, user_id, limit)
+        
+        except Exception as e:
+            logger.error(f"Критическая ошибка в get_similar_articles: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return []
+    
+    def _prepare_text_for_embedding(self, article: Dict) -> str:
+        """Подготовка текста статьи для эмбеддинга"""
+        try:
+            title = article.get("title", "")
+            text = article.get("text", "")
+            tags = article.get("tags", [])
+            
+            # Ограничиваем длину текста для эмбеддинга (оптимально 500-1000 символов)
+            text_preview = text[:800] if len(text) > 800 else text
+            
+            # Обрабатываем теги
+            if isinstance(tags, list):
+                tags_text = " ".join([str(tag) for tag in tags[:10] if tag])
+            elif isinstance(tags, str):
+                tags_text = tags
+            else:
+                tags_text = ""
+            
+            # Комбинируем все компоненты
+            combined = f"{title} {tags_text} {text_preview}"
+            
+            # Очищаем и нормализуем текст
+            import re
+            combined = re.sub(r'\s+', ' ', combined)  # Убираем лишние пробелы
+            combined = combined.strip()
+            
+            logger.debug(f"Подготовлен текст для эмбеддинга: {len(combined)} символов")
+            return combined
+            
+        except Exception as e:
+            logger.error(f"Ошибка подготовки текста для эмбеддинга: {e}")
+            return article.get("title", "") + " " + (article.get("text", "")[:500] or "")
+    
+    def _get_similar_by_metadata(self, target_article: Dict, user_id: str = None, limit: int = 5) -> List[Dict]:
+        """Поиск похожих статей по метаданным (fallback)"""
+        try:
+            logger.info(f"Поиск похожих по метаданным для статьи: {target_article.get('title', '')[:50]}")
+            
+            target_tags = set()
+            if isinstance(target_article.get("tags"), list):
+                target_tags = {str(tag).lower().strip() for tag in target_article.get("tags", []) if tag}
+            elif isinstance(target_article.get("tags"), str):
+                target_tags = {tag.strip().lower() for tag in target_article.get("tags", "").split(",") if tag.strip()}
+            
+            target_author = str(target_article.get("author", "")).lower().strip()
+            target_source = target_article.get("source", "")
+            
+            candidates = []
+            
+            for article in self.all_articles:
+                # Пропускаем ту же статью
+                if article.get("id") == target_article.get("id"):
+                    continue
+                
+                # Проверяем доступность для пользователя
+                if user_id and article.get("is_user_document"):
+                    if article.get("uploaded_by") != user_id:
+                        continue
+                
+                # Вычисляем схожесть по метаданным
+                similarity_score = 0
+                reasons = []
+                
+                # По тегам (самый важный фактор)
+                article_tags = set()
+                if isinstance(article.get("tags"), list):
+                    article_tags = {str(tag).lower().strip() for tag in article.get("tags", []) if tag}
+                elif isinstance(article.get("tags"), str):
+                    article_tags = {tag.strip().lower() for tag in article.get("tags", "").split(",") if tag.strip()}
+                
+                common_tags = target_tags.intersection(article_tags)
+                if common_tags:
+                    tag_similarity = len(common_tags) / max(len(target_tags), 1) * 0.5
+                    similarity_score += min(tag_similarity, 0.5)
+                    if common_tags:
+                        reasons.append(f"общие теги: {', '.join(list(common_tags)[:2])}")
+                
+                # По автору
+                article_author = str(article.get("author", "")).lower().strip()
+                if target_author and article_author and target_author == article_author:
+                    similarity_score += 0.3
+                    reasons.append(f"один автор: {target_author}")
+                
+                # По источнику
+                if target_source and article.get("source") == target_source:
+                    similarity_score += 0.1
+                    reasons.append(f"один источник: {target_source}")
+                
+                # По дате (близкие даты) - только если обе даты есть
+                try:
+                    target_date = target_article.get("date", "")
+                    article_date = article.get("date", "")
+                    if target_date and article_date and len(target_date) >= 10 and len(article_date) >= 10:
+                        # Проверяем, что даты в одном году
+                        if target_date[:4] == article_date[:4]:
+                            similarity_score += 0.05
+                            if not reasons:
+                                reasons.append("публикация в одном году")
+                except:
+                    pass
+                
+                if similarity_score > 0.2:  # Минимальный порог
+                    candidates.append({
+                        "article": article,
+                        "similarity_score": min(similarity_score, 1.0),
+                        "reason": "; ".join(reasons) if reasons else "тематическая схожесть",
+                        "source": "metadata"
+                    })
+            
+            # Сортируем по схожести
+            candidates.sort(key=lambda x: x["similarity_score"], reverse=True)
+            
+            logger.info(f"Найдено {len(candidates)} кандидатов по метаданным")
+            return candidates[:limit]
+            
+        except Exception as e:
+            logger.error(f"Ошибка поиска по метаданным: {e}")
+            return []
+    
+    def _get_article_by_id(self, article_id: str) -> Optional[Dict]:
+        """Поиск статьи по ID"""
+        for article in self.all_articles:
+            if article.get("id") == article_id:
+                return article
+        return None
+    
+    def _get_similarity_reason(self, article1: Dict, article2: Dict) -> str:
+        """Определение причины схожести для пользователя"""
+        reasons = []
+        
+        # Проверка тегов
+        tags1 = set()
+        tags2 = set()
+        
+        if isinstance(article1.get("tags"), list):
+            tags1 = {str(tag).lower().strip() for tag in article1.get("tags", []) if tag}
+        elif isinstance(article1.get("tags"), str):
+            tags1 = {tag.strip().lower() for tag in article1.get("tags", "").split(",") if tag.strip()}
+        
+        if isinstance(article2.get("tags"), list):
+            tags2 = {str(tag).lower().strip() for tag in article2.get("tags", []) if tag}
+        elif isinstance(article2.get("tags"), str):
+            tags2 = {tag.strip().lower() for tag in article2.get("tags", "").split(",") if tag.strip()}
+        
+        common_tags = tags1.intersection(tags2)
+        if common_tags:
+            tags_list = list(common_tags)[:3]
+            reasons.append(f"общие теги: {', '.join(tags_list)}")
+        
+        # Проверка автора
+        author1 = str(article1.get("author", "")).strip()
+        author2 = str(article2.get("author", "")).strip()
+        if author1 and author2 and author1.lower() == author2.lower():
+            reasons.append(f"один автор: {author1}")
+        
+        # Проверка источника
+        source1 = article1.get("source", "")
+        source2 = article2.get("source", "")
+        if source1 and source2 and source1 == source2:
+            reasons.append(f"один источник: {source1}")
+        
+        # Проверка даты (если есть)
+        try:
+            date1 = article1.get("date", "")[:10]
+            date2 = article2.get("date", "")[:10]
+            if date1 and date2 and len(date1) == 10 and len(date2) == 10:
+                if date1[:7] == date2[:7]:  # Год-месяц
+                    reasons.append("публикация в одном месяце")
+                elif date1[:4] == date2[:4]:  # Год
+                    reasons.append("публикация в одном году")
+        except:
+            pass
+        
+        return "; ".join(reasons) if reasons else "тематическая схожесть"
+
+
 __all__ = ["RAGAgent", "SearchScope"]
