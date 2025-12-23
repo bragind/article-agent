@@ -52,7 +52,7 @@ def load_articles(data_path: str) -> List[Dict[str, Any]]:
                             # Пытаемся извлечь из имени файла
                             article["uploaded_by"] = filename.replace("test_article_", "").replace(".json", "")
                         user_articles.append(article)
-                        print(f"  ✓ Загружена пользовательская статья: {article.get('title', 'Без названия')}")
+                        print(f"  Загружена пользовательская статья: {article.get('title', 'Без названия')}")
                 except Exception as e:
                     print(f"Ошибка загрузки пользовательской статьи {filename}: {e}")
         
@@ -128,7 +128,7 @@ def prepare_chunks(articles: List[Dict[str, Any]], chunk_size: int = 800, chunk_
 def build_index(data_path: str, output_dir: str, chunk_size: int = 500, chunk_overlap: int = 50, batch_size: int = 1000):
     """Построение векторного индекса"""
     output_path = str(Path(output_dir).resolve())
-    print(f"📁 Индекс будет сохранён в: {output_path}")
+    print(f"Индекс будет сохранён в: {output_path}")
 
     articles = load_articles(data_path)
     if not articles:
@@ -140,7 +140,7 @@ def build_index(data_path: str, output_dir: str, chunk_size: int = 500, chunk_ov
         print("Нет чанков для индексации")
         return
 
-    print(f"📊 Создано {len(chunks)} чанков из {len(articles)} статей")
+    print(f"Создано {len(chunks)} чанков из {len(articles)} статей")
     
     # Подсчет по типам
     user_chunks = sum(1 for chunk in chunks if chunk["metadata"].get("is_user_document"))
@@ -151,7 +151,7 @@ def build_index(data_path: str, output_dir: str, chunk_size: int = 500, chunk_ov
     # Генерация эмбеддингов
     embedder = Embedder()
     texts = [chunk["text"] for chunk in chunks]
-    print(f"🔢 Генерация эмбеддингов для {len(texts)} текстов...")
+    print(f"Генерация эмбеддингов для {len(texts)} текстов...")
     embeddings = embedder.embed(texts)
     
     if embeddings is None:
@@ -171,7 +171,7 @@ def build_index(data_path: str, output_dir: str, chunk_size: int = 500, chunk_ov
     # Создание VectorStore и очистка старой коллекции
     vector_store = VectorStore(path=output_path, batch_size=batch_size)
 
-    print("\n🧹 Очистка старого индекса (если есть)...")
+    print("\nОчистка старого индекса (если есть)...")
     try:
         # Получаем все существующие записи
         results = vector_store.collection.get()
@@ -180,7 +180,7 @@ def build_index(data_path: str, output_dir: str, chunk_size: int = 500, chunk_ov
             vector_store.collection.delete(ids=results["ids"])
             print(f"Удалено {len(results['ids'])} старых записей")
         else:
-            print("📭 Коллекция пуста")
+            print("Коллекция пуста")
     except Exception as e:
         print(f"Не удалось очистить коллекцию: {e}")
         # Альтернатива: удалить и пересоздать коллекцию
@@ -212,12 +212,12 @@ def build_index(data_path: str, output_dir: str, chunk_size: int = 500, chunk_ov
         count = vector_store.count()
         print(f"\nИндекс успешно построен!")
         print(f"Статистика:")
-        print(f"   • Статей: {len(articles)}")
-        print(f"   • Чанков: {len(chunks)}")
-        print(f"   • В базе: {count} записей")
-        print(f"   • Habr чанков: {habr_chunks}")
-        print(f"   • Пользовательских чанков: {user_chunks}")
-        print(f"   • Среднее чанков на статью: {len(chunks)/len(articles):.1f}")
+        print(f"   - Статей: {len(articles)}")
+        print(f"   - Чанков: {len(chunks)}")
+        print(f"   - В базе: {count} записей")
+        print(f"   - Habr чанков: {habr_chunks}")
+        print(f"   - Пользовательских чанков: {user_chunks}")
+        print(f"   - Среднее чанков на статью: {len(chunks)/len(articles):.1f}")
         
         # Проверка на дубликаты
         if count > len(chunks) * 1.1:  # На 10% больше
@@ -257,7 +257,7 @@ def test_search(query: str, index_dir: str = "chroma_db", top_k: int = 3):
         print(f"Найдено {len(docs)} результатов:")
         
         for i, (doc, meta) in enumerate(zip(docs, metas), start=1):
-            source_type = "📁 Ваш документ" if meta.get("is_user_document") else "🌐 Habr"
+            source_type = "Ваш документ" if meta.get("is_user_document") else "🌐 Habr"
             print(f"\n{i}. {source_type} {meta.get('title', 'Без названия')}")
             print(f"   Автор: {meta.get('author', 'Неизвестен')}")
             print(f"   Дата: {meta.get('date', '')[:10]}")

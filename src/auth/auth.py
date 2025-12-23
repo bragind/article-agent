@@ -335,13 +335,6 @@ class StreamlitAuth:
                 
                 st.write(f"**Вход:** {login_time.strftime('%d.%m.%Y %H:%M')}")
             
-            # Время сессии
-            if self.check_session_timeout():
-                timeout_minutes = self.auth_manager.config["auth"]["session_timeout_minutes"]
-                elapsed = datetime.now() - st.session_state.last_activity
-                remaining = timedelta(minutes=timeout_minutes) - elapsed
-                st.write(f"**Сессия:** {int(remaining.total_seconds() // 60)} мин.")
-            
             # Кнопка выхода
             if st.button("🚪 Выйти", use_container_width=True):
                 self.logout()

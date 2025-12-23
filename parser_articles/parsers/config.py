@@ -3,7 +3,7 @@
 """
 
 # Лимиты парсинга
-MAX_ARTICLES = 1000           # Общее количество статей для сбора
+MAX_ARTICLES = 700           # Общее количество статей для сбора
 ARTICLES_PER_PAGE = 50       # Максимальное количество статей на одной странице
 PAGES_TO_CHECK = 50          # Количество страниц для проверки
 ARTICLES_PER_SECTION = 50     # Статей для обычного парсинга (быстрый режим)
@@ -16,8 +16,7 @@ ERROR_DELAY = 10             # Задержка при ошибках
 # Разделы для парсинга
 SECTIONS = [
     'https://habr.com/ru/all/',
-    'https://tproger.ru/news',
 ]
 
 # Источники для парсинга (по умолчанию все)
-ENABLED_SOURCES = ['habr', 'tproger']
+ENABLED_SOURCES = ['habr']

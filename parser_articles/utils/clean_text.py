@@ -5,7 +5,6 @@ import html
 def clean_html(text: str) -> str:
     """
     Очистка текста от HTML-тегов и лишних символов
-    Сохраняет кириллицу и основную пунктуацию
     """
     if not text:
         return ''

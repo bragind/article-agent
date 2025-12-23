@@ -10,10 +10,8 @@ from datetime import datetime
 import sys
 import os
 
-# Добавляем корень проекта в путь Python
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Абсолютные импорты
 from parser_articles.parsers.config import (
     MAX_ARTICLES, SECTIONS, BASE_DELAY, ERROR_DELAY
 )
@@ -49,9 +47,7 @@ def mass_parse(max_articles=MAX_ARTICLES):
     progress = load_progress()
     already_parsed = set(progress['parsed_articles'])
     
-    print("=" * 60)
     print(f"НАЧИНАЕМ СБОР ССЫЛОК ДЛЯ {max_articles} СТАТЕЙ")
-    print("=" * 60)
     
     all_links = []
     for section in SECTIONS:
@@ -107,9 +103,7 @@ def mass_parse(max_articles=MAX_ARTICLES):
             failed_urls.append(url)
             time.sleep(ERROR_DELAY)
     
-    print("\n" + "=" * 60)
     print("СОХРАНЕНИЕ РЕЗУЛЬТАТОВ")
-    print("=" * 60)
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
